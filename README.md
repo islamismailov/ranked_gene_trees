@@ -4,3 +4,5 @@ A polynomial-time algorithm has been described for computing probabilities of ra
 
 
 This project will provide an implementation of polynomial time algorithm to calculate the probability of a ranked gene tree topology for a given species tree.
+
+You will need to install libgmp to use this code (apt-get install libgmp-dev)
