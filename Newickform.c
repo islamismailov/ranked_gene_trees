@@ -70,7 +70,7 @@ newick_node* parseTree(char *str)
 					pcStart = pcCurrent;
 					pcCurrent++;
 					iCount++;
-					while (iCount > 0)
+					while (iCount > 0) // && *pcCurrent != '\0'
 					{
 						if (*pcCurrent == '(')
 						{
@@ -82,7 +82,7 @@ newick_node* parseTree(char *str)
 						}
 						pcCurrent++;
 					}
-					while (*pcCurrent != ',' && *pcCurrent != ')')
+					while (*pcCurrent != ',' && *pcCurrent != ')') // && *pcCurrent != '\0'
 					{
 						pcCurrent++;
 					}
@@ -110,13 +110,14 @@ newick_node* parseTree(char *str)
 				break;
 
 				case ')':
-					// End of tihs tree. Go to next part to retrieve distance
+					// End of the tree. Go to next part to retrieve distance
 					iCount--;
 				break;
 
 				case ',':
 					// Impossible separation since according to the algorithm, this symbol will never encountered.
 					// Currently don't handle this and don't create any node
+                    //throw runtime_error("bad tree");
 				break;
 
 				default:
