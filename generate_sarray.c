@@ -6,14 +6,15 @@ typedef struct float_array {
     float *last;
 } float_array;
 
-init_float_array(float_array *a) {
+int init_float_array(float_array *a) {
     size_t size = 16;
     a->array = (float *) malloc(size * sizeof(float));
     a->last = a->array;
     a->end = a->array + size;
+    return a->array != NULL;
 }
 
-void append_float_array(float_array *a, float f) {
+int append_float_array(float_array *a, float f) {
     if (a->last != a->end) {
         *(a->last) = f;
         ++(a->last);
@@ -23,6 +24,7 @@ void append_float_array(float_array *a, float f) {
         a->end = a->array + (sz * 2);
         a->last = a->array + sz;
     }
+    return a->array != NULL;
 }
 
 int flt_cmp(float a, float b) {
