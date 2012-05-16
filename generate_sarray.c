@@ -37,7 +37,7 @@ int flt_cmp(float a, float b) {
 void do_dfs(newick_node *t, float distance, float_array *speciation_distances) {
     append_float_array(speciation_distances, distance + t->dist);
     for (newick_child *p = t->child; p != NULL; p = p->next) {
-        dfs(p, distance + t->dist);
+        dfs(p, distance + t->dist, speciation_distances);
     }
 }
 
