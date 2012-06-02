@@ -8,6 +8,10 @@
 #include "utils.h"
 #include "getopt.h"
 
+float max(float x, float y) {
+    return x > y? x : y;
+}
+
 typedef struct node2float {
     newick_node *node;
     float val;
@@ -33,16 +37,36 @@ DEF_ARRAY(char);
 
 void do_get_speciation_distances(newick_node *t, float distance, float_array *speciation_distances) {
     newick_child *p;
-    append_float_array(speciation_distances, distance + t->dist);
+    if (t->childNum > 0) // speciation happened
+        append_float_array(speciation_distances, distance + t->dist);
     for (p = t->child; p != NULL; p = p->next) {
         do_get_speciation_distances(p->node, distance + t->dist, speciation_distances);
     }
 }
 
+float do_get_speciation_distances_bottom(newick_node *t, float distance, float_array *speciation_distances) {
+    newick_child *p;
+
+    //if (t->childNum == 0) return t->dist;
+
+    float dist = 0.f;
+    for (p = t->child; p != NULL; p = p->next) {
+        dist = max(dist, do_get_speciation_distances_bottom(p->node, distance + t->dist, speciation_distances));
+    }
+
+    //dist += t->dist;
+
+    if (t->childNum > 0) // speciation happened
+        append_float_array(speciation_distances, dist);
+
+    return dist + t->dist;
+}
+
 float_array *get_speciation_distances(newick_node *t) {
     float_array *speciation_distances = (float_array *)malloc(sizeof(float_array));
     init_float_array(speciation_distances);
-    do_get_speciation_distances(t, 0.0f, speciation_distances);
+    //do_get_speciation_distances(t, 0.0f, speciation_distances);
+    do_get_speciation_distances_bottom(t, 0.0f, speciation_distances);
     append_float_array(speciation_distances, FLT_MAX);
 
     qsort(speciation_distances->array, speciation_distances->last - speciation_distances->array,
