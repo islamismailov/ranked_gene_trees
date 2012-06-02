@@ -1,33 +1,50 @@
 # $ make
+# $ make install (copy into bin directory)
 
 CC = gcc
 LINK = gcc
 INSTALL = install
+
 CFLAGS = -march=native -O3 -I../include -I.
-LFLAGS = -march=native 
+LFLAGS = -march=native
 
-all: gmptest newicktree spec_array.o utils.o
+GMPLIB = -L/usr/lib -lgmp 
 
-spec_array.o: generate_sarray.c
-	gcc -c generate_sarray.c
+BIN = bin
+OBJ = obj
+SRC = src
 
-utils.o: utils.c
-	gcc -c utils.c
+all: $(BIN)/newicktree $(BIN)/ranked_tree #$(BIN)/gmptest
 
-gmptest:
-	gcc -L/usr/lib -lgmp gmp_test.c -o gmptest
+# Generate object files
+$(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
-newicktree: seqMain.o seqUtil.o Newickform.o
-	gcc -o newicktree seqMain.o seqUtil.o Newickform.o
+$(OBJ)/utils.o: $(SRC)/utils.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
-seqMain.o: seqMain.c
-	gcc -c seqMain.c
+$(OBJ)/seqMain.o: $(SRC)/seqMain.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
-seqUtil.o: seqUtil.c
-	gcc -c seqUtil.c
+$(OBJ)/seqUtil.o: $(SRC)/seqUtil.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
-Newickform.o: Newickform.c
-	gcc -c Newickform.c
+$(OBJ)/Newickform.o: $(SRC)/Newickform.c
+	$(CC) $(CFLAGS) -o $@ -c $^
+
+$(OBJ)/getopt.o: $(SRC)/getopt.c
+	$(CC) $(CFLAGS) -o $@ -c $^
+
+# Build binaries
+
+#$(BIN)/gmptest:
+#	gcc -L/usr/lib -lgmp gmp_test.c -o gmptest
+
+$(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o
+	$(LINK) -o $@ $^ $(LFLAGS)
+
+$(BIN)/newicktree: $(OBJ)/seqMain.o $(OBJ)/seqUtil.o $(OBJ)/Newickform.o
+	$(LINK) -o $@ $^ $(LFLAGS)
 
 clean:
-	-rm *.o newicktree gmptest
+	-rm *.o $(BIN)/newicktree $(BIN)/ranked_tree

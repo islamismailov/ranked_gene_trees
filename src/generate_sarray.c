@@ -1,10 +1,12 @@
 #include <stdlib.h>
 #include <float.h>
 #include <limits.h>
+#include <stdio.h>
 
 #include "Newickform.h"
 
 #include "utils.h"
+#include "getopt.h"
 
 typedef struct node2float {
     newick_node *node;
@@ -27,6 +29,7 @@ int node2float_cmp(node2float a, node2float b) {
 
 DEF_ARRAY(node2float);
 DEF_ARRAY(node2int);
+DEF_ARRAY(char);
 
 void do_get_speciation_distances(newick_node *t, float distance, float_array *speciation_distances) {
     newick_child *p;
@@ -41,8 +44,9 @@ float_array *get_speciation_distances(newick_node *t) {
     init_float_array(speciation_distances);
     do_get_speciation_distances(t, 0.0f, speciation_distances);
     append_float_array(speciation_distances, FLT_MAX);
+
     qsort(speciation_distances->array, speciation_distances->last - speciation_distances->array,
-        sizeof(float), (int(*)(const void*,const void*))flt_cmp);
+        sizeof(float), (int(*)(const void*,const void*))flt_cmp_desc);
     return speciation_distances;
 }
 
@@ -75,7 +79,7 @@ void do_get_distance_array(newick_node *t, float distance, node2float_array *dis
     node2float pair;
     pair.val = distance + t->dist;
     pair.node = t;
-    append_tree_hash_dist_array(dist_array, pair);
+    append_node2float_array(dist_array, pair);
     for (p = t->child; p != NULL; p = p->next) {
         do_get_distance_array(p->node, distance + t->dist, dist_array);
     }
@@ -89,7 +93,7 @@ int get_tree_coalescence_count(newick_node *t) {
     count += 1;
 
     for (p = t->child; p != NULL; p = p->next) {
-        count += get_tree_node_count(p->node);
+        count += get_tree_coalescence_count(p->node);
     }
 
     return count;
@@ -145,13 +149,6 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
     for (i = 1; i <= l; ++i)
         up[v][i] = up[up[v][i - 1]][i - 1];
 
-/*
-    for (size_t i = 0; i < g[v].size(); ++i) {
-        int to = g[v][i];
-        if (to != p)
-            lca_preprocess (to, v);
-    }
-*/
     // iterate through children of coalescence u[v]:
     for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
         int to = 0;
@@ -210,4 +207,107 @@ void lca_end() {
     free(tout);
     for (i = 0; i < n; ++i) free(up[i]);
     free(up);
+}
+
+struct globalArgs_t {
+    const char *inFileName;
+    const char *outFileName;
+} globalArgs;
+
+static const char *optString = "i:o:vh";
+
+static const struct option longOpts[] = {
+    { "in", required_argument, NULL, 'i' },
+    { "out", required_argument, NULL, 'o' },
+    { "version", no_argument, NULL, 'v' },
+    { "help", no_argument, NULL, 'h' },
+    { NULL, no_argument, NULL, 0 } /* long options with no short equivalent go to "case 0:" */
+};
+
+void init_global_args() {
+    globalArgs.inFileName = NULL;
+    globalArgs.outFileName = NULL;
+}
+
+void version(char *prog_name) {
+    printf("%s, v0.1 developed by Islam Ismailov, with support of NESCENT as part of the Google Summer of Code 2012,\nMentors: J Degnan, T Stadler\n", prog_name);
+}
+
+void usage(char *prog_name) {
+    printf("Usage: %s -i (--in) (newick tree file) -o (--out) outputfile\n", prog_name);
+}
+
+int main(int argc, char **argv) {
+    newick_node *root = NULL;
+    char_array *tree_string = (char_array*) malloc(sizeof(char_array));
+    float_array *spec_dists;
+    int_array *gene_lineages;
+    int coalescence_count;
+    node2int_array *coalescence_array;
+    float *fp;
+
+    FILE *f;
+    int i;
+
+    char c;
+    int longIndex;
+    init_global_args();
+
+    int opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
+    while (opt != -1) {
+        switch (opt) {
+            case 'i':
+                globalArgs.inFileName = optarg;
+                break;
+            case 'o':
+                globalArgs.outFileName = optarg;
+                break;
+            case 'v':
+                version(argv[0]);
+                break;
+            case 'h':
+            case '?':
+                usage(argv[0]);
+                break;
+            default:
+                break;
+        }
+
+        opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
+    }
+
+    if (globalArgs.inFileName == NULL || globalArgs.outFileName == NULL) {
+        usage(argv[0]);
+        return -1;
+    }
+
+    // Open tree file
+    f = fopen(globalArgs.inFileName, "r+");
+
+    // Read in tree string
+    init_char_array(tree_string);
+    for (c = fgetc(f); c != EOF && c != '\n'; c = fgetc(f)) {
+        append_char_array(tree_string, c);
+    }
+    append_char_array(tree_string, '\0');
+    fclose(f);
+
+    // Parse tree string
+    root = parseTree(tree_string->array);
+    printTree(root);
+    printf("\n");
+
+    // let's do smth interesting now
+    spec_dists = get_speciation_distances(root);
+    printf("Speciation distances:\n");
+    for (fp = spec_dists->array; fp != spec_dists->last; ++fp) {
+        printf("dist: %f\n", *fp);
+    }
+    //gene_lineages = get_gene_lineages(spec_dists, root);
+    //coalescence_count = get_tree_coalescence_count(root);
+    //coalescence_array = get_coalescence_array(root);
+
+    free(tree_string->array);
+
+    return 0;
 }

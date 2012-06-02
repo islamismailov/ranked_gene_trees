@@ -21,6 +21,10 @@ int init_int_array(int_array *);
 
 int append_int_array(int_array *, int);
 
+int flt_cmp(float *, float *);
+
+int flt_cmp_desc(float *, float *);
+
 #define DEF_ARRAY(ITEM_TYPE) \
    typedef struct { \
       ITEM_TYPE* array; \
@@ -49,6 +53,3 @@ int append_int_array(int_array *, int);
    } \
 
 #endif
-
-int flt_cmp(float, float);
-int flt_cmp_desc(float, float);
