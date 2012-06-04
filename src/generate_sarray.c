@@ -22,8 +22,8 @@ typedef struct node2int {
     int val;
 } node2int;
 
-int node2float_cmp(node2float a, node2float b) {
-    float diff = a.val - b.val;
+int node2float_cmp(node2float *a, node2float *b) {
+    float diff = a->val - b->val;
 
     if (diff > 1e-6)        return  1;
     else if (diff < -1e-6)  return -1;
@@ -158,22 +158,26 @@ int get_tree_coalescence_count(newick_node *t) {
  * coalescence array here is 0-indexed (it's 1-indexed in the original paper)
  */
 node2int_array *get_coalescence_array(newick_node *t) {
-    int i;
+    node2float *n2f;
     node2float_array *dist_array = (node2float_array *)malloc(sizeof(node2float_array));
     node2int_array *coalescence_array = (node2int_array *)malloc(sizeof(node2int_array));
+
+    init_node2float_array(dist_array);
+    init_node2int_array(coalescence_array);
 
     do_get_distance_array(t, 0.f, dist_array);
     qsort(dist_array->array, dist_array->last - dist_array->array,
         sizeof(node2float), (int(*)(const void*,const void*))node2float_cmp);
 
-    int coalescence_count = get_tree_coalescence_count(t);
+    int c = 0;
+    for (n2f = dist_array->array; n2f != dist_array->last; ++n2f) {
+        if (n2f->node->childNum > 0) {
+            node2int pair;
+            pair.node = n2f->node;
+            pair.val = c++;
 
-    for (i = 0; i < coalescence_count; ++i) {
-        node2int pair;
-        pair.node = (dist_array->array + i)->node;
-        pair.val = i;
-
-        append_node2int_array(coalescence_array, pair);
+            append_node2int_array(coalescence_array, pair);
+        }
     }
 
     return coalescence_array;
@@ -195,7 +199,7 @@ int *tin, *tout;
 int **up;
 
 void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
-    int i;
+    int i, to;
     node2int *cp;
     newick_child *np;
 
@@ -205,15 +209,21 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
         up[v][i] = up[up[v][i - 1]][i - 1];
 
     // iterate through children of coalescence u[v]:
+    printf("iterating thru childs of u[%d]@%d:\n", v, coalescence_array->array[v].node);
     for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
-        int to = 0;
-        for (cp = coalescence_array->array; cp != coalescence_array->last; ++cp) {
-            if (cp->node == coalescence_array->array[v].node)
+
+        // find child's index (to)
+        for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
+            //if (cp->node == coalescence_array->array[v].node)
+            if (cp->node == np->node)
                 break;
-            ++to;
         }
-        if (to != p)
-            lca_preprocess(coalescence_array, to, v);
+
+        printf("u[%d](u[%d])@%d is a child? ", to, np->node, cp->val);
+        if (to != p && to != coalescence_array->last - coalescence_array->array) {
+            puts("y");
+            lca_preprocess(coalescence_array, cp->val, v);
+        } else puts("n");
     }
 
     tout[v] = ++timer;
@@ -247,6 +257,7 @@ void lca_init(int n, newick_node *t, node2int_array *coalescence_array) {
     l = 1;
     while ((1 << l) <= n)  ++l;
     for (i = 0; i < n; ++i)  up[i] = (int *) malloc((l + 1) * sizeof(int));
+
     lca_preprocess(coalescence_array, 0, 0);
 
     // queries:
@@ -301,6 +312,7 @@ int main(int argc, char **argv) {
     node2int_array *coalescence_array;
     int *ip;
     float *fp;
+    node2int *n2i;
     float farthest_leaf_dist = 0.f;
 
     FILE *f;
@@ -363,8 +375,6 @@ int main(int argc, char **argv) {
 
     printf("max dist from root: %f\n", farthest_leaf_dist);
 
-    printf("root node: %d children, %f dist from GOD\n", root->childNum, root->dist);
-
     // let's do smth interesting now
     spec_dists = get_speciation_distances(root, farthest_leaf_dist);
     printf("Speciation distances:\n----\n");
@@ -379,8 +389,18 @@ int main(int argc, char **argv) {
         printf("%d\n", *ip);
     }
 
-    //coalescence_count = get_tree_coalescence_count(root);
-    //coalescence_array = get_coalescence_array(root);
+    coalescence_count = get_tree_coalescence_count(root);
+    coalescence_array = get_coalescence_array(root);
+    printf("Coalescence array (size %d):\n---- ---- ---- ----\n", coalescence_count);
+    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
+        printf("val:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+    }
+    printf("---- ---- ---- ---\n");
+    lca_init(coalescence_count,root, coalescence_array);
+
+    //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
+
+    lca_end();
 
     free(tree_string->array);
 

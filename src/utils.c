@@ -5,10 +5,6 @@
 
 int flt_cmp(float *a, float *b) {
     float diff = *a - *b;
-    //if (*a < *b) {printf("%f < %f\n", *a, *b); return -1;}
-    //else if (*b < *a) {printf("%f < %f\n", *b, *a);return 1;}
-    //printf("%f = %f\n", *a, *b);
-    //return 0;
 
     if (diff > 1e-6)        return  1;
     else if (diff < -1e-6)  return -1;
