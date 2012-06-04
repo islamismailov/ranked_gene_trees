@@ -35,38 +35,28 @@ DEF_ARRAY(node2float);
 DEF_ARRAY(node2int);
 DEF_ARRAY(char);
 
-void do_get_speciation_distances(newick_node *t, float distance, float_array *speciation_distances) {
+float max_dist_from_root(newick_node *t) {
     newick_child *p;
-    if (t->childNum > 0) // speciation happened
-        append_float_array(speciation_distances, distance + t->dist);
-    for (p = t->child; p != NULL; p = p->next) {
-        do_get_speciation_distances(p->node, distance + t->dist, speciation_distances);
-    }
-}
-
-float do_get_speciation_distances_bottom(newick_node *t, float distance, float_array *speciation_distances) {
-    newick_child *p;
-
-    //if (t->childNum == 0) return t->dist;
-
     float dist = 0.f;
     for (p = t->child; p != NULL; p = p->next) {
-        dist = max(dist, do_get_speciation_distances_bottom(p->node, distance + t->dist, speciation_distances));
+        dist = max(dist, max_dist_from_root(p->node));
     }
-
-    //dist += t->dist;
-
-    if (t->childNum > 0) // speciation happened
-        append_float_array(speciation_distances, dist);
-
     return dist + t->dist;
 }
 
-float_array *get_speciation_distances(newick_node *t) {
+void do_get_speciation_distances(newick_node *t, float distance, float_array *speciation_distances, float max_dist_from_root) {
+    newick_child *p;
+    if (t->childNum > 0) // speciation happened
+        append_float_array(speciation_distances, max_dist_from_root - (distance + t->dist));
+    for (p = t->child; p != NULL; p = p->next) {
+        do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
+    }
+}
+
+float_array *get_speciation_distances(newick_node *t, float max_dist_from_root) {
     float_array *speciation_distances = (float_array *)malloc(sizeof(float_array));
     init_float_array(speciation_distances);
-    //do_get_speciation_distances(t, 0.0f, speciation_distances);
-    do_get_speciation_distances_bottom(t, 0.0f, speciation_distances);
+    do_get_speciation_distances(t, 0.0f, speciation_distances, max_dist_from_root);
     append_float_array(speciation_distances, FLT_MAX);
 
     qsort(speciation_distances->array, speciation_distances->last - speciation_distances->array,
@@ -74,11 +64,27 @@ float_array *get_speciation_distances(newick_node *t) {
     return speciation_distances;
 }
 
+int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_dist_from_root) {
+    int lineages = 0;
+    newick_child *p;
+    printf("%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+    if ((max_dist_from_root - distance - t->dist) <= limit) {
+        puts("yes");
+        return lineages + 1;
+    } else puts("no");
+
+    for (p = t->child; p != NULL; p = p->next) {
+        lineages += do_get_gene_lineages(p->node, limit, distance + t->dist, max_dist_from_root);
+    }
+
+    return lineages;
+}
+/*
 int do_get_gene_lineages(newick_node *t, float limit, float distance) {
     int lineages = 0;
     newick_child *p;
 
-    if (distance >= distance) return lineages + 1;
+    if (distance >= limit) return lineages + 1;
 
     for (p = t->child; p != NULL; p = p->next) {
         lineages += do_get_gene_lineages(p->node, limit, distance + t->dist);
@@ -87,13 +93,38 @@ int do_get_gene_lineages(newick_node *t, float limit, float distance) {
     return lineages;
 }
 
-int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t) {
+float do_get_gene_lineages_bottom(newick_node *t, float limit, int *lineages, float distance_from_the_root, float max_dist_from_root) {
+    newick_child *p;
+
+    float dist = 0.f, max_dist = 0.f;
+    for (p = t->child; p != NULL; p = p->next) {
+        //dist = max(dist, do_get_speciation_distances(p->node, distance + t->dist, speciation_distances));
+        dist = do_get_gene_lineages_bottom(p->node, limit, lineages, distance_from_the_root + t->dist, max_dist_from_root);
+        max_dist = max(dist, max_dist);
+        //printf("checking between %f and %f limit: %f\n", dist, dist + t->dist, limit);
+        //if (dist < limit && dist + t->dist > limit) {
+        //    ++(*lineages);
+        //}
+    }
+
+    printf("%f in [%f .. %f)? ", limit, max_dist, max_dist + t->dist);
+    if (limit >= max_dist  && limit < max_dist + t->dist) {
+        ++(*lineages);
+        puts("yes!");
+    } else {
+        puts("no!");
+    }
+
+    return max_dist + t->dist;
+}
+*/
+int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t, float max_dist_from_root) {
     float *p;
     int_array *lineages = (int_array *)malloc(sizeof(int_array));
 
     init_int_array(lineages);
     for (p = speciation_distances->array; p != speciation_distances->last; ++p) {
-        append_int_array(lineages, do_get_gene_lineages(t, *p, 0.f));
+        append_int_array(lineages, do_get_gene_lineages(t, *p, 0.f, max_dist_from_root));
     }
     return lineages;
 }
@@ -268,7 +299,9 @@ int main(int argc, char **argv) {
     int_array *gene_lineages;
     int coalescence_count;
     node2int_array *coalescence_array;
+    int *ip;
     float *fp;
+    float farthest_leaf_dist = 0.f;
 
     FILE *f;
     int i;
@@ -310,24 +343,42 @@ int main(int argc, char **argv) {
 
     // Read in tree string
     init_char_array(tree_string);
+    printf("\n\n\n");
     for (c = fgetc(f); c != EOF && c != '\n'; c = fgetc(f)) {
+        putchar(c);
         append_char_array(tree_string, c);
     }
+    printf("\n\n\n");
     append_char_array(tree_string, '\0');
     fclose(f);
+
+    printf("tree string:\n%s\n\n", tree_string->array );
 
     // Parse tree string
     root = parseTree(tree_string->array);
     printTree(root);
-    printf("\n");
+    printf("\n\n");
+
+    farthest_leaf_dist = max_dist_from_root(root);
+
+    printf("max dist from root: %f\n", farthest_leaf_dist);
+
+    printf("root node: %d children, %f dist from GOD\n", root->childNum, root->dist);
 
     // let's do smth interesting now
-    spec_dists = get_speciation_distances(root);
-    printf("Speciation distances:\n");
+    spec_dists = get_speciation_distances(root, farthest_leaf_dist);
+    printf("Speciation distances:\n----\n");
     for (fp = spec_dists->array; fp != spec_dists->last; ++fp) {
-        printf("dist: %f\n", *fp);
+        printf("%f\n", *fp);
     }
-    //gene_lineages = get_gene_lineages(spec_dists, root);
+    printf("----\n");
+
+    gene_lineages = get_gene_lineages(spec_dists, root, farthest_leaf_dist);
+    printf("Gene Lineages:\n");
+    for (ip = gene_lineages->array; ip != gene_lineages->last; ++ip) {
+        printf("%d\n", *ip);
+    }
+
     //coalescence_count = get_tree_coalescence_count(root);
     //coalescence_array = get_coalescence_array(root);
 

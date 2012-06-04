@@ -41,14 +41,15 @@ int flt_cmp_desc(float *, float *);
    int append_##ITEM_TYPE##_array(ITEM_TYPE##_array* a, ITEM_TYPE val) \
    { \
        if (a->last != a->end) { \
-           *(a->last) = val; \
-           ++(a->last); \
+           ; \
        } else { \
            size_t sz = a->end - a->array; \
            a->array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
            a->last = a->end; \
            a->end = a->array + (sz * 2); \
        } \
+       *(a->last) = val; \
+       ++(a->last); \
        return a->array != NULL; \
    } \
 
