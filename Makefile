@@ -14,7 +14,7 @@ BIN = bin
 OBJ = obj
 SRC = src
 
-all: $(BIN)/newicktree $(BIN)/ranked_tree #$(BIN)/gmptest
+all: ensure_dirs $(BIN)/newicktree $(BIN)/ranked_tree #$(BIN)/gmptest
 
 # Generate object files
 $(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
@@ -46,5 +46,12 @@ $(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o 
 $(BIN)/newicktree: $(OBJ)/seqMain.o $(OBJ)/seqUtil.o $(OBJ)/Newickform.o
 	$(LINK) -o $@ $^ $(LFLAGS)
 
+.PHONY: ensure_dirs clean
+
+ensure_dirs:
+	@if [ ! -d $(BIN) ]; then mkdir $(BIN); fi
+	@if [ ! -d $(OBJ) ]; then mkdir $(OBJ); fi
+
 clean:
-	-rm *.o $(BIN)/newicktree $(BIN)/ranked_tree
+	rm -rf $(OBJ)/*.o $(BIN)/newicktree $(BIN)/ranked_tree
+
