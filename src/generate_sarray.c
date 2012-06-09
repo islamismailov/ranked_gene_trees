@@ -209,9 +209,9 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
         up[v][i] = up[up[v][i - 1]][i - 1];
 
     // iterate through children of coalescence u[v]:
-    printf("iterating thru childs of u[%d]@%d:\n", v, coalescence_array->array[v].node);
-    for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
 
+    for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
+        printf("iterating thru childs of u[%d]@%d:\n", v, coalescence_array->array[v].node);
         // find child's index (to)
         for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
             //if (cp->node == coalescence_array->array[v].node)
@@ -219,7 +219,7 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
                 break;
         }
 
-        printf("u[%d](u[%d])@%d is a child? ", to, np->node, cp->val);
+        printf("u[%d](u[%d])@%d is a child? ", to, cp->val, np->node);
         if (to != p && to != coalescence_array->last - coalescence_array->array) {
             puts("y");
             lca_preprocess(coalescence_array, cp->val, v);
@@ -398,7 +398,7 @@ int main(int argc, char **argv) {
     printf("---- ---- ---- ---\n");
     lca_init(coalescence_count,root, coalescence_array);
 
-    //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
+    printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
 
     lca_end();
 
