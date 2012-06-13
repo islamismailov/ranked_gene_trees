@@ -1,14 +1,13 @@
 #ifndef __NEWICKFORM_H__
 #define __NEWICKFORM_H__
 
-typedef struct newick_child
-{
+typedef struct newick_child {
 	struct newick_node *node;
 	struct newick_child *next;
 } newick_child;
 
-typedef struct newick_node
-{
+typedef struct newick_node {
+    int id;
 	char *taxon;
 	char *seq;
 	float dist;

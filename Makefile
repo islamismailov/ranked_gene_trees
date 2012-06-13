@@ -14,7 +14,7 @@ BIN = bin
 OBJ = obj
 SRC = src
 
-all: ensure_dirs $(BIN)/newicktree $(BIN)/ranked_tree #$(BIN)/gmptest
+all: ensure_dirs $(BIN)/newicktree $(BIN)/ranked_tree
 
 # Generate object files
 $(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
@@ -37,9 +37,6 @@ $(OBJ)/getopt.o: $(SRC)/getopt.c
 
 # Build binaries
 
-#$(BIN)/gmptest:
-#	gcc -L/usr/lib -lgmp gmp_test.c -o gmptest
-
 $(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o
 	$(LINK) -o $@ $^ $(LFLAGS)
 
@@ -54,4 +51,3 @@ ensure_dirs:
 
 clean:
 	rm -rf $(OBJ)/*.o $(BIN)/newicktree $(BIN)/ranked_tree
-

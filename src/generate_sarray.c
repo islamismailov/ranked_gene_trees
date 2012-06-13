@@ -31,9 +31,13 @@ int node2float_cmp(node2float *a, node2float *b) {
     return 0;
 }
 
+typedef char * char_ptr;
+
 DEF_ARRAY(node2float);
 DEF_ARRAY(node2int);
 DEF_ARRAY(char);
+DEF_ARRAY(char_ptr);
+
 
 float max_dist_from_root(newick_node *t) {
     newick_child *p;
@@ -129,6 +133,9 @@ int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t, 
     return lineages;
 }
 
+/*
+ * distances from the root for each node
+ */
 void do_get_distance_array(newick_node *t, float distance, node2float_array *dist_array) {
     newick_child *p;
     node2float pair;
@@ -140,6 +147,7 @@ void do_get_distance_array(newick_node *t, float distance, node2float_array *dis
     }
 }
 
+// TODO: remove later, used for debugging
 int get_tree_coalescence_count(newick_node *t) {
     int count = 0;
     newick_child *p;
@@ -156,6 +164,7 @@ int get_tree_coalescence_count(newick_node *t) {
 
 /*
  * coalescence array here is 0-indexed (it's 1-indexed in the original paper)
+ * nodes are sorted by distance
  */
 node2int_array *get_coalescence_array(newick_node *t) {
     node2float *n2f;
@@ -183,7 +192,93 @@ node2int_array *get_coalescence_array(newick_node *t) {
     return coalescence_array;
 }
 
+void do_bead_tree(newick_node *t, float distance, float_array *speciation_distances, float max_dist_from_root) {
+    int i;
+    float *fp;
 
+    newick_node *bead;
+    newick_child *p, *q, *child, *child_head, *new_child;
+
+    float start_interval, end_interval;
+
+    start_interval = max_dist_from_root - (distance + t->dist);
+    for (p = t->child; p != NULL; ) {
+        do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
+        // find if there are any speciation times in between this node and it's child
+        end_interval = max_dist_from_root - (distance + t->dist + p->node->dist);
+
+        child = p;
+        child_head = t->child;
+
+        p = p->next;
+
+        for (fp = (speciation_distances->last - 1); fp != (speciation_distances->array - 1); --fp) {
+            if (*fp > start_interval && *fp < end_interval) {
+                // delete son from the old node
+                if (child_head->next == p) {
+                    child_head->next = child->next;
+                } else {
+                    for (q = child_head; q != NULL; q = q->next) {
+                        if (q->next == p) break;
+                    }
+                    q->next = child->next;
+                }
+
+                bead = (newick_node *) seqMalloc(sizeof(newick_node));
+                bead->dist = *fp;
+                bead->child = child;
+                bead->child->node->parent = bead;
+                bead->childNum = 1;
+                bead->child->next = NULL;
+
+                // now attach bead as one of t's children:
+                new_child = (newick_child *) seqMalloc(sizeof(newick_child));
+                new_child->node = bead;
+                new_child->next = t->child;
+                t->child = new_child;
+                bead->parent = t;
+
+                // parents number of children stayed same
+
+                child = new_child;
+                child_head = new_child;
+                end_interval = *fp;
+            }
+        }
+    }
+}
+
+void bead_tree(newick_node *n, float_array *speciation_times, float max_dist_from_root) {
+    do_bead_tree(n, 0.f, speciation_times, max_dist_from_root);
+}
+
+/*
+ * nodes array
+ * nodes are sorted by distance
+ */
+node2int_array *get_indexed_array(newick_node *t) {
+    node2float *n2f;
+    node2float_array *dist_array = (node2float_array *)malloc(sizeof(node2float_array));
+    node2int_array *nodes_array = (node2int_array *)malloc(sizeof(node2int_array));
+
+    init_node2float_array(dist_array);
+    init_node2int_array(nodes_array);
+
+    do_get_distance_array(t, 0.f, dist_array);
+    qsort(dist_array->array, dist_array->last - dist_array->array,
+        sizeof(node2float), (int(*)(const void*,const void*))node2float_cmp);
+
+    int c = 0;
+    for (n2f = dist_array->array; n2f != dist_array->last; ++n2f) {
+        node2int pair;
+        pair.node = n2f->node;
+        pair.val = c++;
+
+        append_node2int_array(nodes_array, pair);
+    }
+
+    return nodes_array;
+}
 
 
 
@@ -247,7 +342,50 @@ int lca(int a, int b) {
     return up[a][0];
 }
 
-void lca_init(int n, newick_node *t, node2int_array *coalescence_array) {
+void do_get_all_descedants_taxons(newick_node *n, char_ptr_array *descedants_array_taxons) {
+    newick_child *p;
+
+    append_char_ptr_array(descedants_array_taxons, n->taxon);
+
+    for (p = n->child; p != NULL; p = p->next) {
+        do_get_all_descedants_taxons(p->node, descedants_array_taxons);
+    }
+}
+
+int get_species_node_id_for_taxon(newick_node *n, char *t) {
+    int id = -1;
+    newick_child *p;
+
+    if (strcmp(n->taxon, t) == 0) {
+        return n->id;
+    }
+
+    for (p = n->child; p != NULL; p = p->next) {
+        id = get_species_node_id_for_taxon(p->node, t);
+    }
+
+    return id;
+}
+
+float get_distance_from_root(newick_node *n) {
+    float dist = n->dist;
+    if (n->parent != NULL) dist += get_distance_from_root(n->parent);
+    return dist;
+}
+
+char_ptr_array *get_all_descedants_taxons(newick_node *n) {
+    newick_child *p;
+    char_ptr_array *descedants_array_taxons = (char_ptr_array*) malloc(sizeof(char_ptr_array));
+    init_char_ptr_array(descedants_array_taxons);
+
+    for (p = n->child; p != NULL; p = p->next) {
+        do_get_all_descedants_taxons(p->node, descedants_array_taxons);
+    }
+
+    return descedants_array_taxons;
+}
+
+void lca_init(int n, node2int_array *coalescence_array) {
     int i;
 
     tin = (int *) malloc(n * sizeof(int));
@@ -259,12 +397,6 @@ void lca_init(int n, newick_node *t, node2int_array *coalescence_array) {
     for (i = 0; i < n; ++i)  up[i] = (int *) malloc((l + 1) * sizeof(int));
 
     lca_preprocess(coalescence_array, 0, 0);
-
-    // queries:
-    //for (;;) {
-    //    int a, b; for u[a], u[b]
-    //    int res = lca (a, b);
-    //}
 }
 
 void lca_end() {
@@ -275,15 +407,38 @@ void lca_end() {
     free(up);
 }
 
+newick_node *tree_from_file(char *filename) {
+    char c;
+    newick_node *tree;
+    char_array *tree_string = (char_array*) malloc(sizeof(char_array));
+
+    FILE *f = fopen(globalArgs.speciesTreeFileName, "r+");
+
+    init_char_array(tree_string);
+    for (c = fgetc(f); c != EOF && c != '\n'; c = fgetc(f)) {
+        append_char_array(tree_string, c);
+    }
+    append_char_array(tree_string, '\0');
+
+    tree = parseTree(tree_string->array);
+
+    free(tree_string->array);
+    fclose(f);
+
+    return tree;
+}
+
 struct globalArgs_t {
-    const char *inFileName;
+    const char *geneTreeFileName;
+    const char *speciesTreeFileName;
     const char *outFileName;
 } globalArgs;
 
 static const char *optString = "i:o:vh";
 
 static const struct option longOpts[] = {
-    { "in", required_argument, NULL, 'i' },
+    { "stree", required_argument, NULL, 's' },
+    { "gtree", required_argument, NULL, 'g' },
     { "out", required_argument, NULL, 'o' },
     { "version", no_argument, NULL, 'v' },
     { "help", no_argument, NULL, 'h' },
@@ -291,7 +446,8 @@ static const struct option longOpts[] = {
 };
 
 void init_global_args() {
-    globalArgs.inFileName = NULL;
+    globalArgs.geneTreeFileName = NULL;
+    globalArgs.speciesTreeFileName = NULL;
     globalArgs.outFileName = NULL;
 }
 
@@ -300,33 +456,36 @@ void version(char *prog_name) {
 }
 
 void usage(char *prog_name) {
-    printf("Usage: %s -i (--in) (newick tree file) -o (--out) outputfile\n", prog_name);
+    printf("Usage: %s -g (--gtree) gene tree (newick tree file) -s (--stree) species tree (newick tree file) -o (--out) outputfile\n", prog_name);
 }
 
 int main(int argc, char **argv) {
-    newick_node *root = NULL;
-    char_array *tree_string = (char_array*) malloc(sizeof(char_array));
+    newick_node *species_tree = NULL;
+    newick_node *gene_tree = NULL;
+
     float_array *spec_dists;
     int_array *gene_lineages;
     int coalescence_count;
     node2int_array *coalescence_array;
+    node2int_array *species_indexed_nodes;
     int *ip;
     float *fp;
     node2int *n2i;
     float farthest_leaf_dist = 0.f;
 
-    FILE *f;
     int i;
 
-    char c;
     int longIndex;
     init_global_args();
 
     int opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
     while (opt != -1) {
         switch (opt) {
-            case 'i':
-                globalArgs.inFileName = optarg;
+            case 's':
+                globalArgs.speciesTreeFileName = optarg;
+                break;
+            case 'g':
+                globalArgs.geneTreeFileName = optarg;
                 break;
             case 'o':
                 globalArgs.outFileName = optarg;
@@ -345,64 +504,79 @@ int main(int argc, char **argv) {
         opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
     }
 
-    if (globalArgs.inFileName == NULL || globalArgs.outFileName == NULL) {
+    if (globalArgs.geneTreeFileName == NULL || globalArgs.speciesTreeFileName == NULL || globalArgs.outFileName == NULL) {
         usage(argv[0]);
         return -1;
     }
 
-    // Open tree file
-    f = fopen(globalArgs.inFileName, "r+");
+    gene_tree = tree_from_file(globalArgs.geneTreeFileName);
+    species_tree = tree_from_file(globalArgs.speciesTreeFileName);
 
-    // Read in tree string
-    init_char_array(tree_string);
-    printf("\n\n\n");
-    for (c = fgetc(f); c != EOF && c != '\n'; c = fgetc(f)) {
-        putchar(c);
-        append_char_array(tree_string, c);
-    }
-    printf("\n\n\n");
-    append_char_array(tree_string, '\0');
-    fclose(f);
-
-    printf("tree string:\n%s\n\n", tree_string->array );
-
-    // Parse tree string
-    root = parseTree(tree_string->array);
-    printTree(root);
-    printf("\n\n");
-
-    farthest_leaf_dist = max_dist_from_root(root);
+    farthest_leaf_dist = max_dist_from_root(species_tree);
 
     printf("max dist from root: %f\n", farthest_leaf_dist);
 
     // let's do smth interesting now
-    spec_dists = get_speciation_distances(root, farthest_leaf_dist);
+    spec_dists = get_speciation_distances(species_tree, farthest_leaf_dist);
     printf("Speciation distances:\n----\n");
     for (fp = spec_dists->array; fp != spec_dists->last; ++fp) {
         printf("%f\n", *fp);
     }
     printf("----\n");
 
-    gene_lineages = get_gene_lineages(spec_dists, root, farthest_leaf_dist);
+    gene_lineages = get_gene_lineages(spec_dists, gene_tree, farthest_leaf_dist);
     printf("Gene Lineages:\n");
     for (ip = gene_lineages->array; ip != gene_lineages->last; ++ip) {
         printf("%d\n", *ip);
     }
 
-    coalescence_count = get_tree_coalescence_count(root);
-    coalescence_array = get_coalescence_array(root);
+    coalescence_count = get_tree_coalescence_count(gene_tree);
+    coalescence_array = get_coalescence_array(gene_tree);
     printf("Coalescence array (size %d):\n---- ---- ---- ----\n", coalescence_count);
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
         printf("val:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
     }
     printf("---- ---- ---- ---\n");
-    lca_init(coalescence_count,root, coalescence_array);
 
-    printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
+    //lca_init(coalescence_count, root, coalescence_array);
+    //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
+    //lca_end();
+
+    species_indexed_nodes = get_indexed_array(species_tree);
+    lca_init(species_indexed_nodes->last - species_indexed_nodes->array, species_indexed_nodes);
+
+    // for each node in a gene tree we need to get all descendants' taxa, so we can finds
+    // the lca of the nodes in species tree with the same taxas
+    int_array *equivalent_node_ids = (int_array *) malloc(sizeof(int_array));
+    init_int_array(equivalent_node_ids);
+    int lca_idx;
+    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
+        char_ptr_array *taxa = get_all_descedants_taxons(n2i->node);
+        printf("val:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+        printf("with children (taxa):\n");
+        char **taxon;
+        for (taxon = taxa->array; taxon != taxa->last; ++taxa) {
+            append_int_array(equivalent_node_ids, get_species_node_id_for_taxon(gene_tree, *taxon));
+        }
+        // now we need to find lowest common ancestor for these nodes
+        lca_idx = *(equivalent_node_ids->array);
+        for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
+            lca_idx = lca(lca_idx, *ip);
+        }
+        // let's find tau interval for a given lowest common ancestor
+        // so that we need to calculate it's distance from the farthest leaf from the root
+        printf("lca is %d\n", lca_idx);
+
+        float lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
+
+        float fp_n;
+        int tau_idx = 0;
+        for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+            if (lca_dist >= *fp && lca_dist < *(fp + 1)) break;
+        }
+        //ok we got tau index now
+    }
 
     lca_end();
-
-    free(tree_string->array);
-
     return 0;
 }
