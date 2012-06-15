@@ -71,7 +71,7 @@ float_array *get_speciation_distances(newick_node *t, float max_dist_from_root) 
 int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_dist_from_root) {
     int lineages = 0;
     newick_child *p;
-    printf("%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+    printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
     if ((max_dist_from_root - distance - t->dist) <= limit) {
         puts("yes");
         return lineages + 1;
@@ -407,22 +407,25 @@ void lca_end() {
     free(up);
 }
 
-newick_node *tree_from_file(char *filename) {
+newick_node *tree_from_file(const char *filename) {
     char c;
     newick_node *tree;
-    char_array *tree_string = (char_array*) malloc(sizeof(char_array));
+    char_array tree_string;
 
-    FILE *f = fopen(globalArgs.speciesTreeFileName, "r+");
+    FILE *f = fopen(filename, "r+");
 
-    init_char_array(tree_string);
+    init_char_array(&tree_string);
     for (c = fgetc(f); c != EOF && c != '\n'; c = fgetc(f)) {
-        append_char_array(tree_string, c);
+        append_char_array(&tree_string, c);
     }
-    append_char_array(tree_string, '\0');
+    append_char_array(&tree_string, '\0');
 
-    tree = parseTree(tree_string->array);
+    puts("tree string:");
+    puts(tree_string.array);
 
-    free(tree_string->array);
+    tree = parseTree(tree_string.array);
+
+    free(tree_string.array);
     fclose(f);
 
     return tree;
@@ -434,7 +437,15 @@ struct globalArgs_t {
     const char *outFileName;
 } globalArgs;
 
-static const char *optString = "i:o:vh";
+void version(char *prog_name) {
+    printf("%s, v0.1 developed by Islam Ismailov, with support of NESCENT as part of the Google Summer of Code 2012,\nMentors: J Degnan, T Stadler\n", prog_name);
+}
+
+void usage(char *prog_name) {
+    printf("Usage: %s -g (--gtree) gene tree (newick tree file) -s (--stree) species tree (newick tree file) -o (--out) outputfile\n", prog_name);
+}
+
+static const char *optString = "g:s:o:vh";
 
 static const struct option longOpts[] = {
     { "stree", required_argument, NULL, 's' },
@@ -451,33 +462,8 @@ void init_global_args() {
     globalArgs.outFileName = NULL;
 }
 
-void version(char *prog_name) {
-    printf("%s, v0.1 developed by Islam Ismailov, with support of NESCENT as part of the Google Summer of Code 2012,\nMentors: J Degnan, T Stadler\n", prog_name);
-}
-
-void usage(char *prog_name) {
-    printf("Usage: %s -g (--gtree) gene tree (newick tree file) -s (--stree) species tree (newick tree file) -o (--out) outputfile\n", prog_name);
-}
-
-int main(int argc, char **argv) {
-    newick_node *species_tree = NULL;
-    newick_node *gene_tree = NULL;
-
-    float_array *spec_dists;
-    int_array *gene_lineages;
-    int coalescence_count;
-    node2int_array *coalescence_array;
-    node2int_array *species_indexed_nodes;
-    int *ip;
-    float *fp;
-    node2int *n2i;
-    float farthest_leaf_dist = 0.f;
-
-    int i;
-
+void parse_global_args(int argc, char **argv) {
     int longIndex;
-    init_global_args();
-
     int opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
     while (opt != -1) {
         switch (opt) {
@@ -500,44 +486,87 @@ int main(int argc, char **argv) {
             default:
                 break;
         }
-
         opt = getopt_long(argc, argv, optString, longOpts, &longIndex);
     }
+}
+
+int main(int argc, char **argv) {
+    newick_node *species_tree = NULL;
+    newick_node *gene_tree = NULL;
+
+    float_array *spec_dists;
+    int_array *gene_lineages;
+    int coalescence_count;
+    node2int_array *coalescence_array;
+    node2int_array *species_indexed_nodes;
+    int *ip;
+    float *fp;
+    node2int *n2i;
+    float farthest_leaf_dist = 0.f;
+    puts("init global args");
+    init_global_args();
+    puts("parse global args");
+    parse_global_args(argc, argv);
 
     if (globalArgs.geneTreeFileName == NULL || globalArgs.speciesTreeFileName == NULL || globalArgs.outFileName == NULL) {
         usage(argv[0]);
         return -1;
     }
-
+    puts("parse trees");
     gene_tree = tree_from_file(globalArgs.geneTreeFileName);
     species_tree = tree_from_file(globalArgs.speciesTreeFileName);
+    puts("post parse trees");
+
+#ifndef NDEBUG
+    printf("\n\nGene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printTree(gene_tree);
+
+    printf("\n\nSpecies tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printTree(species_tree);
+#endif
 
     farthest_leaf_dist = max_dist_from_root(species_tree);
 
-    printf("max dist from root: %f\n", farthest_leaf_dist);
+#ifndef NDEBUG
+    printf("\n\nMax distance from root:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\t%f\n", farthest_leaf_dist);
+#endif
 
-    // let's do smth interesting now
+    // find speciation distances (0 is farthest leaf from the root)
     spec_dists = get_speciation_distances(species_tree, farthest_leaf_dist);
-    printf("Speciation distances:\n----\n");
+
+#ifndef NDEBUG
+    printf("\n\nSpeciation distances:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (fp = spec_dists->array; fp != spec_dists->last; ++fp) {
-        printf("%f\n", *fp);
+        printf("\t%f\n", *fp);
     }
-    printf("----\n");
+#endif
+
+#ifndef NDEBUG
+    printf("\n\nGene Lineages:\n");
+#endif
 
     gene_lineages = get_gene_lineages(spec_dists, gene_tree, farthest_leaf_dist);
-    printf("Gene Lineages:\n");
+
+#ifndef NDEBUG
     for (ip = gene_lineages->array; ip != gene_lineages->last; ++ip) {
-        printf("%d\n", *ip);
+        printf("\t%d\n", *ip);
     }
+#endif
 
-    coalescence_count = get_tree_coalescence_count(gene_tree);
+    //coalescence_count = get_tree_coalescence_count(gene_tree);
+
+    // get coalescence array of the gene tree (find all nodes that have children)
     coalescence_array = get_coalescence_array(gene_tree);
-    printf("Coalescence array (size %d):\n---- ---- ---- ----\n", coalescence_count);
-    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-        printf("val:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
-    }
-    printf("---- ---- ---- ---\n");
 
+#ifndef NDEBUG
+    printf("\n\nCoalescence array (size %d):\n---- ---- ---- ---- ---- ---- ---- ----\n", coalescence_count);
+    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
+        printf("\tval:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+    }
+#endif
+
+/*
     //lca_init(coalescence_count, root, coalescence_array);
     //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
     //lca_end();
@@ -578,5 +607,6 @@ int main(int argc, char **argv) {
     }
 
     lca_end();
+*/
     return 0;
 }
