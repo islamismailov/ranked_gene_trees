@@ -386,9 +386,6 @@ newick_node *tree_from_file(const char *filename) {
     }
     append_char_array(&tree_string, '\0');
 
-    puts("tree string:");
-    puts(tree_string.array);
-
     tree = parseTree(tree_string.array);
 
     free(tree_string.array);
@@ -469,19 +466,17 @@ int main(int argc, char **argv) {
     float *fp;
     node2int *n2i;
     float farthest_leaf_dist = 0.f;
-    puts("init global args");
+
     init_global_args();
-    puts("parse global args");
     parse_global_args(argc, argv);
 
     if (globalArgs.geneTreeFileName == NULL || globalArgs.speciesTreeFileName == NULL || globalArgs.outFileName == NULL) {
         usage(argv[0]);
         return -1;
     }
-    puts("parse trees");
+
     gene_tree = tree_from_file(globalArgs.geneTreeFileName);
     species_tree = tree_from_file(globalArgs.speciesTreeFileName);
-    puts("post parse trees");
 
 #ifndef NDEBUG
     printf("\n\nGene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -565,9 +560,11 @@ int main(int argc, char **argv) {
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
 #ifndef NDEBUG
-        printf("\n\nAll descedants taxa and their equivalent ids for <val:%d node:%d>:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->val, n2i->node);
+        printf("\n\nAll descedants taxa and their equivalent ids for node:@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->val, n2i->node);
 #endif
         char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
+
+        clear_int_array(equivalent_node_ids);
 
         int id;
         char **taxon;
@@ -580,14 +577,22 @@ int main(int argc, char **argv) {
 #endif
         }
 
+#ifndef NDEBUG
+        printf("\n\nLCA search:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
         // now we need to find lowest common ancestor for these nodes
         lca_idx = *(equivalent_node_ids->array);
         for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
             lca_idx = lca(lca_idx, *ip);
+
+#ifndef NDEBUG
+            printf("\tLCA(%d, %d): %d:\n", lca_idx, *ip, lca_idx);
+#endif
         }
         // let's find tau interval for a given lowest common ancestor
         // so that we need to calculate it's distance from the farthest leaf from the root
-        printf("lca is %d\n", lca_idx);
+        printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d\n", lca_idx);
 
         float lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
 

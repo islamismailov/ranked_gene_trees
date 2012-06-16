@@ -33,6 +33,7 @@ int flt_cmp_desc(float *, float *);
       ITEM_TYPE* last; \
       ITEM_TYPE* end; \
    } ITEM_TYPE##_array; \
+   \
    int init_##ITEM_TYPE##_array(ITEM_TYPE##_array *a) { \
        size_t size = 16; \
        a->array = (ITEM_TYPE *) malloc(size * sizeof(ITEM_TYPE)); \
@@ -53,6 +54,9 @@ int flt_cmp_desc(float *, float *);
        *(a->last) = val; \
        ++(a->last); \
        return a->array != NULL; \
+   } \
+   void clear_##ITEM_TYPE##_array(ITEM_TYPE##_array* a) { \
+       a->last = a->array; \
    } \
 
 #endif

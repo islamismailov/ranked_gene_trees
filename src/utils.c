@@ -41,6 +41,10 @@ int append_float_array(float_array *a, float val) {
     return a->array != NULL;
 }
 
+void clear_float_array(float_array *a) {
+    a->last = a->array;
+}
+
 int init_int_array(int_array *a) {
     size_t size = 16;
     a->array = (int *) malloc(size * sizeof(int));
@@ -59,4 +63,8 @@ int append_int_array(int_array *a, int val) {
     *(a->last) = val;
     ++(a->last);
     return a->array != NULL;
+}
+
+void clear_int_array(int_array *a) {
+    a->last = a->array;
 }
