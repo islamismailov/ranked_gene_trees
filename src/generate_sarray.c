@@ -232,6 +232,7 @@ node2int_array *get_indexed_array(newick_node *t) {
     int c = 0;
     for (n2f = dist_array->array; n2f != dist_array->last; ++n2f) {
         node2int pair;
+        n2f->node->id = c;
         pair.node = n2f->node;
         pair.val = c++;
 
@@ -303,15 +304,13 @@ int lca(int a, int b) {
     return up[a][0];
 }
 
-void do_get_all_descedants_taxons(newick_node *n, char_ptr_array *descedants_array_taxons) {
+void do_get_all_descedants_taxa(newick_node *n, char_ptr_array *descedants_array_taxa) {
     newick_child *p;
 
-    printf("\tappending %s\n", n->taxon == NULL ? "NULL" : n->taxon);
-
-    append_char_ptr_array(descedants_array_taxons, n->taxon);
+    if (n->taxon != NULL) append_char_ptr_array(descedants_array_taxa, n->taxon);
 
     for (p = n->child; p != NULL; p = p->next) {
-        do_get_all_descedants_taxons(p->node, descedants_array_taxons);
+        do_get_all_descedants_taxa(p->node, descedants_array_taxa);
     }
 }
 
@@ -319,12 +318,16 @@ int get_species_node_id_for_taxon(newick_node *n, char *t) {
     int id = -1;
     newick_child *p;
 
-    if (strcmp(n->taxon, t) == 0) {
+    if (t == NULL) return id;
+
+    if (n->taxon != NULL && strcmp(n->taxon, t) == 0) {
         return n->id;
     }
 
+    int cur_id;
     for (p = n->child; p != NULL; p = p->next) {
-        id = get_species_node_id_for_taxon(p->node, t);
+        cur_id = get_species_node_id_for_taxon(p->node, t);
+        id = cur_id != -1 ? cur_id : id;
     }
 
     return id;
@@ -336,16 +339,16 @@ float get_distance_from_root(newick_node *n) {
     return dist;
 }
 
-char_ptr_array *get_all_descedants_taxons(newick_node *n) {
+char_ptr_array *get_all_descedants_taxa(newick_node *n) {
     newick_child *p;
-    char_ptr_array *descedants_array_taxons = (char_ptr_array*) malloc(sizeof(char_ptr_array));
-    init_char_ptr_array(descedants_array_taxons);
+    char_ptr_array *descedants_array_taxa = (char_ptr_array*) malloc(sizeof(char_ptr_array));
+    init_char_ptr_array(descedants_array_taxa);
 
     for (p = n->child; p != NULL; p = p->next) {
-        do_get_all_descedants_taxons(p->node, descedants_array_taxons);
+        do_get_all_descedants_taxa(p->node, descedants_array_taxa);
     }
 
-    return descedants_array_taxons;
+    return descedants_array_taxa;
 }
 
 void lca_init(int n, node2int_array *coalescence_array) {
@@ -533,9 +536,20 @@ int main(int argc, char **argv) {
     //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
     //lca_end();
 
+#ifndef NDEBUG
+    printf("\n\Indexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
     // assign each node of species tree integer id (sorted by distance from the root)
     // to fast search for our lca implementation
     species_indexed_nodes = get_indexed_array(species_tree);
+
+#ifndef NDEBUG
+    for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
+        printf("\tnode@%u with node id %d and array index %d\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
+    }
+#endif
+
 
 #ifndef NDEBUG
     printf("\n\nLCA:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -551,26 +565,21 @@ int main(int argc, char **argv) {
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
 #ifndef NDEBUG
-        printf("\n\nAll descedants taxons:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+        printf("\n\nAll descedants taxa and their equivalent ids for <val:%d node:%d>:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->val, n2i->node);
 #endif
-        char_ptr_array *taxa = get_all_descedants_taxons(n2i->node);
+        char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
 
-#ifndef NDEBUG
-        char **t;
-        for (t = taxa->array; t != taxa->last; ++t) {
-            //printf("\t%12u\n",t);
-            printf("taxon %s\n", *t == NULL ? "NULL" : *t);
-            //append_int_array(equivalent_node_ids, get_species_node_id_for_taxon(gene_tree, *taxon));
-        }
-#endif
-
-
-        printf("val:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
-        printf("with children (taxa):\n");
+        int id;
         char **taxon;
         for (taxon = taxa->array; taxon != taxa->last; ++taxon) {
-            append_int_array(equivalent_node_ids, get_species_node_id_for_taxon(gene_tree, *taxon));
+            id = get_species_node_id_for_taxon(species_tree, *taxon);
+            if (id != -1) append_int_array(equivalent_node_ids, id);
+
+#ifndef NDEBUG
+            printf("\ttaxon:%s id:%d\n", *taxon == NULL ? "NULL" : *taxon, id);
+#endif
         }
+
         // now we need to find lowest common ancestor for these nodes
         lca_idx = *(equivalent_node_ids->array);
         for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
