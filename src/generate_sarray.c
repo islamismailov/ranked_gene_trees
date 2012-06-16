@@ -82,45 +82,7 @@ int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_
 
     return lineages;
 }
-/*
-int do_get_gene_lineages(newick_node *t, float limit, float distance) {
-    int lineages = 0;
-    newick_child *p;
 
-    if (distance >= limit) return lineages + 1;
-
-    for (p = t->child; p != NULL; p = p->next) {
-        lineages += do_get_gene_lineages(p->node, limit, distance + t->dist);
-    }
-
-    return lineages;
-}
-
-float do_get_gene_lineages_bottom(newick_node *t, float limit, int *lineages, float distance_from_the_root, float max_dist_from_root) {
-    newick_child *p;
-
-    float dist = 0.f, max_dist = 0.f;
-    for (p = t->child; p != NULL; p = p->next) {
-        //dist = max(dist, do_get_speciation_distances(p->node, distance + t->dist, speciation_distances));
-        dist = do_get_gene_lineages_bottom(p->node, limit, lineages, distance_from_the_root + t->dist, max_dist_from_root);
-        max_dist = max(dist, max_dist);
-        //printf("checking between %f and %f limit: %f\n", dist, dist + t->dist, limit);
-        //if (dist < limit && dist + t->dist > limit) {
-        //    ++(*lineages);
-        //}
-    }
-
-    printf("%f in [%f .. %f)? ", limit, max_dist, max_dist + t->dist);
-    if (limit >= max_dist  && limit < max_dist + t->dist) {
-        ++(*lineages);
-        puts("yes!");
-    } else {
-        puts("no!");
-    }
-
-    return max_dist + t->dist;
-}
-*/
 int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t, float max_dist_from_root) {
     float *p;
     int_array *lineages = (int_array *)malloc(sizeof(int_array));
