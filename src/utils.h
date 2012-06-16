@@ -42,6 +42,7 @@ int flt_cmp_desc(float *, float *);
        return a->array != NULL; \
    } \
    int append_##ITEM_TYPE##_array(ITEM_TYPE##_array* a, ITEM_TYPE val) { \
+       /* printf("%12u %12u %12u\n", a->array, a->last, a->end); */ \
        if (a->last == a->end) { \
            size_t sz = a->end - a->array; \
            a->array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
