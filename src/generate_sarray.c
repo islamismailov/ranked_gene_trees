@@ -590,18 +590,21 @@ int main(int argc, char **argv) {
             printf("\tLCA(%d, %d): %d:\n", lca_idx, *ip, lca_idx);
 #endif
         }
+
         // let's find tau interval for a given lowest common ancestor
         // so that we need to calculate it's distance from the farthest leaf from the root
-        printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d\n", lca_idx);
-
         float lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
-
-        float fp_n;
-        int tau_idx = 0;
         for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
-            if (lca_dist >= *fp && lca_dist < *(fp + 1)) break;
+            if (lca_dist >= *(fp + 1) && lca_dist < *fp) {
+                break;
+            }
         }
-        //ok we got tau index now
+
+        int tau_idx = fp - spec_dists->array;
+
+#ifndef NDEBUG
+        printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d with Tau index %d\n", lca_idx, tau_idx);
+#endif
     }
 
     lca_end();
