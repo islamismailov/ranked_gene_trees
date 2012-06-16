@@ -532,7 +532,7 @@ int main(int argc, char **argv) {
     //lca_end();
 
 #ifndef NDEBUG
-    printf("\n\Indexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nIndexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
 
     // assign each node of species tree integer id (sorted by distance from the root)
@@ -560,7 +560,7 @@ int main(int argc, char **argv) {
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
 #ifndef NDEBUG
-        printf("\n\nAll descedants taxa and their equivalent ids for node:@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->val, n2i->node);
+        printf("\n\nAll descedants taxa and their equivalent ids for node@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
 #endif
         char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
 

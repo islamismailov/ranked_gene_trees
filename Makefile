@@ -36,12 +36,11 @@ $(OBJ)/getopt.o: $(SRC)/getopt.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 # Build binaries
-
 $(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o
-	$(LINK) -o $@ $^ $(LFLAGS)
+	$(LINK) $(LFLAGS) -o $@ $^
 
 $(BIN)/newicktree: $(OBJ)/seqMain.o $(OBJ)/seqUtil.o $(OBJ)/Newickform.o
-	$(LINK) -o $@ $^ $(LFLAGS)
+	$(LINK) $(LFLAGS) -o $@ $^
 
 .PHONY: ensure_dirs clean
 

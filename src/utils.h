@@ -59,4 +59,6 @@ int flt_cmp_desc(float *, float *);
        a->last = a->array; \
    } \
 
+#define clear_array(X) X.last = X.array;
+
 #endif
