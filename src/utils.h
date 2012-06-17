@@ -10,8 +10,8 @@ typedef struct float_array {
 } float_array;
 
 int init_float_array(float_array *);
-
 int append_float_array(float_array *, float);
+void clear_float_array(float_array *);
 
 typedef struct int_array {
     int *array;
@@ -20,11 +20,10 @@ typedef struct int_array {
 } int_array;
 
 int init_int_array(int_array *);
-
 int append_int_array(int_array *, int);
+void clear_int_array(int_array *);
 
 int flt_cmp(float *, float *);
-
 int flt_cmp_desc(float *, float *);
 
 #define DEF_ARRAY(ITEM_TYPE) \

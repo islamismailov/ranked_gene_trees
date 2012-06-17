@@ -7,6 +7,8 @@
 
 #include "utils.h"
 #include "getopt.h"
+#include "hash_table.h"
+#include "seqUtil.h"
 
 float max(float x, float y) {
     return x > y? x : y;
@@ -154,7 +156,6 @@ node2int_array *get_coalescence_array(newick_node *t) {
 }
 
 void do_bead_tree(newick_node *t, float distance, float_array *speciation_distances, float max_dist_from_root) {
-    int i;
     float *fp;
 
     newick_node *bead;
@@ -268,7 +269,7 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
     // iterate through children of coalescence u[v]:
 
     for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
-        printf("\titerating thru children of u[%d]@%d:\n", v, coalescence_array->array[v].node);
+        printf("\titerating thru children of u[%d]@%u:\n", v, coalescence_array->array[v].node);
         // find child's index (to)
         for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
             //if (cp->node == coalescence_array->array[v].node)
@@ -276,7 +277,7 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
                 break;
         }
 
-        printf("\tu[%d](u[%d])@%d is a child? ", to, cp->val, np->node);
+        printf("\tu[%d](u[%d])@%u is a child? ", to, cp->val, np->node);
         if (to != p && to != coalescence_array->last - coalescence_array->array) {
             puts("y");
             lca_preprocess(coalescence_array, cp->val, v);
@@ -463,6 +464,7 @@ int main(int argc, char **argv) {
     node2int_array *coalescence_array;
     node2int_array *species_indexed_nodes;
     int *ip;
+    int i, j, k, n;
     float *fp;
     node2int *n2i;
     float farthest_leaf_dist = 0.f;
@@ -489,7 +491,7 @@ int main(int argc, char **argv) {
     farthest_leaf_dist = max_dist_from_root(species_tree);
 
 #ifndef NDEBUG
-    printf("\n\nMax distance from root:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nMax distance from root for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     printf("\t%f\n", farthest_leaf_dist);
 #endif
 
@@ -523,7 +525,7 @@ int main(int argc, char **argv) {
 #ifndef NDEBUG
     printf("\n\nCoalescence array (size %d):\n---- ---- ---- ---- ---- ---- ---- ----\n", coalescence_count);
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-        printf("\tval:%d node:%d childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+        printf("\tval:%d node:%u childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
     }
 #endif
 
@@ -545,6 +547,8 @@ int main(int argc, char **argv) {
     }
 #endif
 
+    // this array holds number of coalescence events in interval tau[i]
+    // TODO: add m array
 
 #ifndef NDEBUG
     printf("\n\nLCA:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -557,6 +561,7 @@ int main(int argc, char **argv) {
     init_int_array(equivalent_node_ids);
 
     int lca_idx;
+/*
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
 #ifndef NDEBUG
@@ -587,7 +592,7 @@ int main(int argc, char **argv) {
             lca_idx = lca(lca_idx, *ip);
 
 #ifndef NDEBUG
-            printf("\tLCA(%d, %d): %d:\n", lca_idx, *ip, lca_idx);
+            printf("\tLCA(%d, %d): %d\n", lca_idx, *ip, lca_idx);
 #endif
         }
 
@@ -606,6 +611,90 @@ int main(int argc, char **argv) {
         printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d with Tau index %d\n", lca_idx, tau_idx);
 #endif
     }
+*/
+    int_array g;
+    init_int_array(&g);
+
+    n = spec_dists->last - spec_dists->array;
+    for (i = 0; i < n; ++i) {
+        int min_lineages = 0;
+
+        for (j = i + 1; j < n - 1; ++j) {
+            double product = 1.0;
+            for (k = j; k < n - 1; ++k) {
+                printf("i:%d, j:%d, k:%d\n", i, j, k);
+
+                n2i = (coalescence_array->array + k);
+
+#ifndef NDEBUG
+                printf("\n\nAll descedants taxa and their equivalent ids for node@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
+#endif
+
+                char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
+
+                clear_int_array(equivalent_node_ids);
+
+                int id;
+                char **taxon;
+                for (taxon = taxa->array; taxon != taxa->last; ++taxon) {
+                    id = get_species_node_id_for_taxon(species_tree, *taxon);
+                    if (id != -1) append_int_array(equivalent_node_ids, id);
+
+#ifndef NDEBUG
+                    printf("\ttaxon:%s id:%d\n", *taxon == NULL ? "NULL" : *taxon, id);
+#endif
+                }
+
+#ifndef NDEBUG
+                printf("\n\nLCA search:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
+                // now we need to find lowest common ancestor for these nodes
+                lca_idx = *(equivalent_node_ids->array);
+                for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
+                    lca_idx = lca(lca_idx, *ip);
+
+#ifndef NDEBUG
+                    printf("\tLCA(%d, %d): %d\n", lca_idx, *ip, lca_idx);
+#endif
+                }
+
+                // let's find tau interval for a given lowest common ancestor
+                // and to do that we need to calculate it's distance from the farthest leaf from the root
+                float lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
+                for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+                    if (lca_dist >= *(fp + 1) && lca_dist < *fp) {
+                        break;
+                    }
+                }
+
+                int tau_idx = fp - spec_dists->array;
+
+#ifndef NDEBUG
+                printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d with Tau index %d\n", lca_idx, tau_idx);
+#endif
+
+                product *= (tau_idx > i) ? 1 : 0;
+            }
+            min_lineages += product;
+        }
+        append_int_array(&g, n - min_lineages);
+
+    }
+
+#ifndef NDEBUG
+        printf("\n\ng array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+        for (ip = g.array; ip != g.last; ++ip) {
+            printf("\tg[%d]:%d\n", ip - g.array, *ip);
+        }
+#endif
+    printf("small hash test\n");
+    float f = 32.5f;
+    hash_table *xtab = get_new_hash_table();
+    insert(xtab, (void *)&f, sizeof(f));
+    void *p = lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
+    if (p != NULL) puts("HOORAY");
+    else puts("BAD");
 
     lca_end();
     return 0;

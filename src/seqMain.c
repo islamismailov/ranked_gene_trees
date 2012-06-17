@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			printf("Unrecognized identifier: %s\nProgram stop.\n, argv[i]");
+			printf("Unrecognized identifier: %s\nProgram will stop.\n", argv[i]);
 			seqFreeAll();
 			exit(-1);
 		}
@@ -102,5 +102,6 @@ int main(int argc, char *argv[])
 
 	// End memory management procedure and free all allocated space
 	seqFreeAll();
+	return 0;
 }
 

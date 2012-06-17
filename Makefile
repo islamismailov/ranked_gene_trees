@@ -5,7 +5,7 @@ CC = gcc
 LINK = gcc
 INSTALL = install
 
-CFLAGS = -march=native -O3 -I../include -I.
+CFLAGS = -Wall -march=native -O3 -I../include -I.
 LFLAGS = -march=native
 
 GMPLIB = -L/usr/lib -lgmp 
@@ -18,6 +18,9 @@ all: ensure_dirs $(BIN)/newicktree $(BIN)/ranked_tree
 
 # Generate object files
 $(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
+	$(CC) $(CFLAGS) -o $@ -c $^
+
+$(OBJ)/hash_table.o: $(SRC)/hash_table.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 $(OBJ)/utils.o: $(SRC)/utils.c
@@ -36,7 +39,7 @@ $(OBJ)/getopt.o: $(SRC)/getopt.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 # Build binaries
-$(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o
+$(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o $(OBJ)/hash_table.o
 	$(LINK) $(LFLAGS) -o $@ $^
 
 $(BIN)/newicktree: $(OBJ)/seqMain.o $(OBJ)/seqUtil.o $(OBJ)/Newickform.o
