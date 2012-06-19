@@ -1,7 +1,10 @@
 #define __NEWICKFORM_C__
 
-#include "seqUtil.h"
-#include "Newickform.h"
+#include <stdio.h>
+#include <string.h>
+
+#include "monitored_memory.h"
+#include "newick_tree.h"
 
 newick_node* parseTree(char *str)
 {
@@ -31,18 +34,18 @@ newick_node* parseTree(char *str)
 			}
 			pcCurrent++;
 		}
-		node = (newick_node*)seqMalloc(sizeof(newick_node));
+		node = (newick_node*)monitored_malloc(sizeof(newick_node));
 		if (pcColon == NULL)
 		{
 			// Taxon only
-			node->taxon = (char*)seqMalloc(strlen(pcStart) + 1);
+			node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 		}
 		else
 		{
 			// Taxon
 			*pcColon = '\0';
-			node->taxon = (char*)seqMalloc(strlen(pcStart) + 1);
+			node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcColon = ':';
 			// Distance
@@ -54,7 +57,7 @@ newick_node* parseTree(char *str)
 	else
 	{
 		// Create node
-		node = (newick_node*)seqMalloc(sizeof(newick_node));
+		node = (newick_node*)monitored_malloc(sizeof(newick_node));
 		child = NULL;
 		// Search for all child nodes
 		// Find all ',' until corresponding ')' is encountered
@@ -91,13 +94,13 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-						node->child = (newick_child*)seqMalloc(sizeof(newick_child));
+						node->child = (newick_child*)monitored_malloc(sizeof(newick_child));
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-						child->next = (newick_child*)seqMalloc(sizeof(newick_child));
+						child->next = (newick_child*)monitored_malloc(sizeof(newick_child));
 						node->childNum++;
 						child = child->next;
 					}
@@ -132,13 +135,13 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-						node->child = (newick_child*)seqMalloc(sizeof(newick_child));
+						node->child = (newick_child*)monitored_malloc(sizeof(newick_child));
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-						child->next = (newick_child*)seqMalloc(sizeof(newick_child));
+						child->next = (newick_child*)monitored_malloc(sizeof(newick_child));
 						node->childNum++;
 						child = child->next;
 					}
@@ -177,7 +180,7 @@ newick_node* parseTree(char *str)
 			}
 			cTemp = *pcCurrent;
 			*pcCurrent = '\0';
-			node->taxon = seqMalloc(strlen(pcStart) + 1);
+			node->taxon = monitored_malloc(strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcCurrent = cTemp;
 			pcCurrent++;

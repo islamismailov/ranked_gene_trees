@@ -2,13 +2,14 @@
 #include <float.h>
 #include <limits.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "Newickform.h"
+#include "newick_tree.h"
 
 #include "utils.h"
 #include "getopt.h"
 #include "hash_table.h"
-#include "seqUtil.h"
+#include "monitored_memory.h"
 
 float max(float x, float y) {
     return x > y? x : y;
@@ -186,7 +187,7 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
                     q->next = child->next;
                 }
 
-                bead = (newick_node *) seqMalloc(sizeof(newick_node));
+                bead = (newick_node *) monitored_malloc(sizeof(newick_node));
                 bead->dist = *fp;
                 bead->child = child;
                 bead->child->node->parent = bead;
@@ -194,7 +195,7 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
                 bead->child->next = NULL;
 
                 // now attach bead as one of t's children:
-                new_child = (newick_child *) seqMalloc(sizeof(newick_child));
+                new_child = (newick_child *) monitored_malloc(sizeof(newick_child));
                 new_child->node = bead;
                 new_child->next = t->child;
                 t->child = new_child;
@@ -269,7 +270,7 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
     // iterate through children of coalescence u[v]:
 
     for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
-        printf("\titerating thru children of u[%d]@%u:\n", v, coalescence_array->array[v].node);
+        printf("\titerating thru children of u[%d]@%p:\n", v, coalescence_array->array[v].node);
         // find child's index (to)
         for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
             //if (cp->node == coalescence_array->array[v].node)
@@ -277,7 +278,7 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
                 break;
         }
 
-        printf("\tu[%d](u[%d])@%u is a child? ", to, cp->val, np->node);
+        printf("\tu[%d](u[%d])@%p is a child? ", to, cp->val, np->node);
         if (to != p && to != coalescence_array->last - coalescence_array->array) {
             puts("y");
             lca_preprocess(coalescence_array, cp->val, v);
@@ -517,7 +518,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    //coalescence_count = get_tree_coalescence_count(gene_tree);
+    coalescence_count = get_tree_coalescence_count(gene_tree);
 
     // get coalescence array of the gene tree (find all nodes that have children)
     coalescence_array = get_coalescence_array(gene_tree);
@@ -525,7 +526,7 @@ int main(int argc, char **argv) {
 #ifndef NDEBUG
     printf("\n\nCoalescence array (size %d):\n---- ---- ---- ---- ---- ---- ---- ----\n", coalescence_count);
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-        printf("\tval:%d node:%u childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+        printf("\tval:%d node@%p childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
     }
 #endif
 
@@ -543,7 +544,7 @@ int main(int argc, char **argv) {
 
 #ifndef NDEBUG
     for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
-        printf("\tnode@%u with node id %d and array index %d\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
+        printf("\tnode@%p with node id %d and array index %d\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
     }
 #endif
 
@@ -565,7 +566,7 @@ int main(int argc, char **argv) {
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
 #ifndef NDEBUG
-        printf("\n\nAll descedants taxa and their equivalent ids for node@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
+        printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
 #endif
         char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
 
@@ -627,7 +628,7 @@ int main(int argc, char **argv) {
                 n2i = (coalescence_array->array + k);
 
 #ifndef NDEBUG
-                printf("\n\nAll descedants taxa and their equivalent ids for node@%u:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
+                printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
 #endif
 
                 char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
@@ -690,11 +691,18 @@ int main(int argc, char **argv) {
 #endif
     printf("small hash test\n");
     float f = 32.5f;
-    hash_table *xtab = get_new_hash_table();
-    insert(xtab, (void *)&f, sizeof(f));
-    void *p = lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
-    if (p != NULL) puts("HOORAY");
-    else puts("BAD");
+    hash_table *xtab = htab_get_new();
+    htab_insert(xtab, (void *)&f, sizeof(f));
+    void *p = htab_lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
+    if (p != NULL) puts("found: expected");
+    else puts("not found: UNEXPECTED");
+
+    htab_remove(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
+
+    p = htab_lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
+    if (p != NULL) puts("found: UNEXPECTED");
+    else puts("not found: expected");
+    htab_free_table(xtab);
 
     lca_end();
     return 0;

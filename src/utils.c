@@ -32,7 +32,11 @@ int init_float_array(float_array *a) {
 int append_float_array(float_array *a, float val) {
     if (a->last == a->end) {
         size_t sz = a->end - a->array;
-        a->array = (float *)realloc(a->array, (sz * 2) * sizeof(float));
+        float *realloc_array = (float *)realloc(a->array, (sz * 2) * sizeof(float));
+        if (a->array != realloc_array) {
+            free(a->array);
+            a->array = realloc_array;
+        }
         a->last = a->array + sz;
         a->end = a->array + (sz * 2);
     }
@@ -56,7 +60,11 @@ int init_int_array(int_array *a) {
 int append_int_array(int_array *a, int val) {
     if (a->last == a->end) {
         size_t sz = a->end - a->array;
-        a->array = (int *)realloc(a->array, (sz * 2) * sizeof(int));
+        int *realloc_array = (int *)realloc(a->array, (sz * 2) * sizeof(int));
+        if (a->array != realloc_array) {
+            free(a->array);
+            a->array = realloc_array;
+        }
         a->last = a->array + sz;
         a->end = a->array + (sz * 2);
     }

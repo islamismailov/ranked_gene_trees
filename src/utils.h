@@ -45,7 +45,11 @@ int flt_cmp_desc(float *, float *);
        /* printf("%12u %12u %12u\n", a->array, a->last, a->end); */ \
        if (a->last == a->end) { \
            size_t sz = a->end - a->array; \
-           a->array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
+           ITEM_TYPE *realloc_array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
+           if (a->array != realloc_array) { \
+               free(a->array); \
+               a->array = realloc_array; \
+           } \
            assert(a->array != NULL); \
            a->last = a->array + sz; \
            a->end = a->array + (sz * 2); \

@@ -14,7 +14,9 @@ BIN = bin
 OBJ = obj
 SRC = src
 
-all: ensure_dirs $(BIN)/newicktree $(BIN)/ranked_tree
+.PHONY: ensure_dirs clean
+
+all: ensure_dirs $(BIN)/ranked_tree
 
 # Generate object files
 $(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
@@ -26,30 +28,22 @@ $(OBJ)/hash_table.o: $(SRC)/hash_table.c
 $(OBJ)/utils.o: $(SRC)/utils.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
-$(OBJ)/seqMain.o: $(SRC)/seqMain.c
+$(OBJ)/monitored_memory.o: $(SRC)/monitored_memory.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
-$(OBJ)/seqUtil.o: $(SRC)/seqUtil.c
-	$(CC) $(CFLAGS) -o $@ -c $^
-
-$(OBJ)/Newickform.o: $(SRC)/Newickform.c
+$(OBJ)/newick_tree.o: $(SRC)/newick_tree.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 $(OBJ)/getopt.o: $(SRC)/getopt.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 # Build binaries
-$(BIN)/ranked_tree: $(OBJ)/Newickform.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/seqUtil.o $(OBJ)/hash_table.o
+$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o
 	$(LINK) $(LFLAGS) -o $@ $^
-
-$(BIN)/newicktree: $(OBJ)/seqMain.o $(OBJ)/seqUtil.o $(OBJ)/Newickform.o
-	$(LINK) $(LFLAGS) -o $@ $^
-
-.PHONY: ensure_dirs clean
 
 ensure_dirs:
 	@if [ ! -d $(BIN) ]; then mkdir $(BIN); fi
 	@if [ ! -d $(OBJ) ]; then mkdir $(OBJ); fi
 
 clean:
-	rm -rf $(OBJ)/*.o $(BIN)/newicktree $(BIN)/ranked_tree
+	rm -rf $(OBJ)/*.o $(BIN)/ranked_tree
