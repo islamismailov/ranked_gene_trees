@@ -33,8 +33,7 @@ int append_float_array(float_array *a, float val) {
     if (a->last == a->end) {
         size_t sz = a->end - a->array;
         float *realloc_array = (float *)realloc(a->array, (sz * 2) * sizeof(float));
-        if (a->array != realloc_array) {
-            free(a->array);
+        if (a->array != NULL) {
             a->array = realloc_array;
         }
         a->last = a->array + sz;
@@ -61,8 +60,7 @@ int append_int_array(int_array *a, int val) {
     if (a->last == a->end) {
         size_t sz = a->end - a->array;
         int *realloc_array = (int *)realloc(a->array, (sz * 2) * sizeof(int));
-        if (a->array != realloc_array) {
-            free(a->array);
+        if (a->array != NULL) {
             a->array = realloc_array;
         }
         a->last = a->array + sz;

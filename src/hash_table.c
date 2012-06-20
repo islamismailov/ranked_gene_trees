@@ -50,6 +50,7 @@ void htab_grow(hash_table *table) {
             free(iter);
             iter = iter_next;
         }
+        old_elements[i] = NULL;
     }
     free(old_elements);
     old_elements = NULL;

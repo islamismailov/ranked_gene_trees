@@ -97,6 +97,50 @@ int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t, 
     return lineages;
 }
 
+int do_get_gene_lineages_for_k(newick_node *t, float limit, float distance, float max_dist_from_root, int_array *species_turns, int_array *gene_turns, int turn) {
+    int lineages = 0;
+    newick_child *p;
+    int *gp, *sp;
+
+    if (turn != -1) append_int_array(gene_turns, turn);
+
+    // check that gene_turns begins with_species_turns
+    int same_topology = 1;
+    for (gp = gene_turns->array, sp = species_turns->array; gp != gene_turns->last && sp != species_turns->last; ++gp, ++sp) {
+        if (*gp != *sp) {
+            same_topology = 0;
+            break;
+        }
+    }
+
+    if (!same_topology) return 0;
+
+    printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+
+    if ((max_dist_from_root - distance - t->dist) <= limit) {
+        puts("yes");
+        return lineages + 1;
+    } else puts("no");
+
+    int child_index = 0;
+    for (p = t->child; p != NULL; p = p->next) {
+        lineages += do_get_gene_lineages_for_k(p->node, limit, distance + t->dist, max_dist_from_root, species_turns, gene_turns, child_index++);
+    }
+
+    // remove added turn
+    if (gene_turns->last - gene_turns->array > 0) --(gene_turns->last);
+
+    return lineages;
+}
+
+int get_gene_lineages_for_k(float *speciation_distance, newick_node *t, float max_dist_from_root, int_array *species_turns) {
+    int lineages = 0;
+    int_array *gene_turns = (int_array *) malloc(sizeof(int_array));
+    init_int_array(gene_turns);
+    lineages = do_get_gene_lineages_for_k(t, *speciation_distance, 0.f, max_dist_from_root, species_turns, gene_turns, -1);
+    return lineages;
+}
+
 /*
  * distances from the root for each node
  */
@@ -353,6 +397,18 @@ char_ptr_array *get_all_descedants_taxa(newick_node *n) {
     return descedants_array_taxa;
 }
 
+int get_leaves_count(newick_node *n) {
+    int leaves_count = 0;
+    newick_child *p;
+
+    if (n->childNum == 0) return 1;
+
+    for (p = n->child; p != NULL; p = p->next) {
+        leaves_count += get_leaves_count(p->node);
+    }
+    return leaves_count;
+}
+
 void lca_init(int n, node2int_array *coalescence_array) {
     int i;
 
@@ -469,6 +525,8 @@ int main(int argc, char **argv) {
     float *fp;
     node2int *n2i;
     float farthest_leaf_dist = 0.f;
+
+    monitored_memory_init();
 
     init_global_args();
     parse_global_args(argc, argv);
@@ -616,7 +674,7 @@ int main(int argc, char **argv) {
     int_array g;
     init_int_array(&g);
 
-    n = spec_dists->last - spec_dists->array;
+    n = get_leaves_count(species_tree); // should be same for gene_tree
     for (i = 0; i < n; ++i) {
         int min_lineages = 0;
 

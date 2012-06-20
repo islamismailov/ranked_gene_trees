@@ -42,15 +42,14 @@ int flt_cmp_desc(float *, float *);
        return a->array != NULL; \
    } \
    int append_##ITEM_TYPE##_array(ITEM_TYPE##_array* a, ITEM_TYPE val) { \
-       /* printf("%12u %12u %12u\n", a->array, a->last, a->end); */ \
+       /* printf("%12p %12p %12p\n", a->array, a->last, a->end); */ \
        if (a->last == a->end) { \
            size_t sz = a->end - a->array; \
-           ITEM_TYPE *realloc_array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
-           if (a->array != realloc_array) { \
-               free(a->array); \
+           ITEM_TYPE * realloc_array = (ITEM_TYPE *)realloc(a->array, (sz * 2) * sizeof(ITEM_TYPE)); \
+           if (realloc_array != NULL) { \
                a->array = realloc_array; \
            } \
-           assert(a->array != NULL); \
+           assert(realloc_array != NULL); \
            a->last = a->array + sz; \
            a->end = a->array + (sz * 2); \
        } \
@@ -63,5 +62,6 @@ int flt_cmp_desc(float *, float *);
    } \
 
 #define clear_array(X) X.last = X.array;
+#define array_size(X) (X.last - X.array)
 
 #endif

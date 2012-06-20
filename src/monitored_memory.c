@@ -23,7 +23,10 @@ void *monitored_calloc(size_t size, size_t n) {
 
 void *monitored_realloc(void *p, size_t size) {
     void *realloc_p = realloc (p, size);
-    if (realloc_p != p) htab_do_insert(mem_tab, realloc_p, (size_t)realloc_p);  // use address as a hash value
+    if (realloc_p != p) {
+        htab_do_remove(mem_tab, p, (size_t) p, (__compar_fn_t) compar_int);
+        htab_do_insert(mem_tab, realloc_p, (size_t)realloc_p);  // use address as a hash value
+    }
     return realloc_p;
 }
 
