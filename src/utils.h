@@ -3,26 +3,6 @@
 
 #include <assert.h>
 
-typedef struct float_array {
-    float *array;
-    float *end;
-    float *last;
-} float_array;
-
-int init_float_array(float_array *);
-int append_float_array(float_array *, float);
-void clear_float_array(float_array *);
-
-typedef struct int_array {
-    int *array;
-    int *end;
-    int *last;
-} int_array;
-
-int init_int_array(int_array *);
-int append_int_array(int_array *, int);
-void clear_int_array(int_array *);
-
 int flt_cmp(float *, float *);
 int flt_cmp_desc(float *, float *);
 
@@ -61,7 +41,7 @@ int flt_cmp_desc(float *, float *);
        a->last = a->array; \
    } \
 
-#define clear_array(X) X.last = X.array;
-#define array_size(X) (X.last - X.array)
+#define clear_array(X) (X).last = (X).array;
+#define array_size(X) ((X).last - (X).array)
 
 #endif

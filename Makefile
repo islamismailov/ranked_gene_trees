@@ -5,7 +5,7 @@ CC = gcc
 LINK = gcc
 INSTALL = install
 
-CFLAGS = -Wall -march=native -mtune=native -I../include -I. -ggdb # -O3
+CFLAGS = -Wall -march=native -mtune=native -I../include -I. -ggdb # replace -ggdb for -O3 for release 
 LFLAGS = -march=native -mtune=native
 
 GMPLIB = -L/usr/lib -lgmp 

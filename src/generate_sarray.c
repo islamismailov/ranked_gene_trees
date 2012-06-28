@@ -35,11 +35,29 @@ int node2float_cmp(node2float *a, node2float *b) {
 }
 
 typedef char * char_ptr;
+typedef int * int_ptr;
+typedef int ** int_ptr_ptr;
+typedef int *** int_ptr_ptr_ptr;
+typedef newick_node * newick_node_ptr;
+
+DEF_ARRAY(int);
+DEF_ARRAY(char);
+DEF_ARRAY(float);
+
+DEF_ARRAY(newick_node_ptr);
+DEF_ARRAY(newick_node_ptr_array);
 
 DEF_ARRAY(node2float);
 DEF_ARRAY(node2int);
-DEF_ARRAY(char);
 DEF_ARRAY(char_ptr);
+DEF_ARRAY(int_array);
+DEF_ARRAY(int_array_array);
+
+float get_distance_from_root(newick_node *n) {
+    float dist = n->dist;
+    if (n->parent != NULL) dist += get_distance_from_root(n->parent);
+    return dist;
+}
 
 float max_dist_from_root(newick_node *t) {
     newick_child *p;
@@ -198,6 +216,112 @@ node2int_array *get_coalescence_array(newick_node *t) {
     }
 
     return coalescence_array;
+}
+
+int do_get_topology_prefix(int_array *x, newick_node *n, newick_node *target) {
+    if (n == target) return 1;
+
+    int child_idx;
+    newick_child *p;
+    for (p = n->child, child_idx = 0; p != NULL; p = p->next, ++child_idx) {
+        int found = do_get_topology_prefix(x, p->node, target);
+        if (found) {
+            append_int_array(x, child_idx);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int_array get_topology_prefix(newick_node *n, newick_node *target) {
+    int_array topology_prefix;
+    do_get_topology_prefix(&topology_prefix, n, target);
+    return topology_prefix;
+}
+/*
+ *
+int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_dist_from_root) {
+    int lineages = 0;
+    newick_child *p;
+    printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+    if ((max_dist_from_root - distance - t->dist) <= limit) {
+        puts("yes");
+        return lineages + 1;
+    } else puts("no");
+
+    for (p = t->child; p != NULL; p = p->next) {
+        lineages += do_get_gene_lineages(p->node, limit, distance + t->dist, max_dist_from_root);
+    }
+
+    return lineages;
+*/
+
+int do_get_exit_branches(newick_node *n, float limit, float distance, int_array *topology_prefix, int_array *self_topology_prefix, float max_dist_from_root) {
+    int exit_branches_count = 0;
+    newick_child *p;
+    printf("\t%f <= %f? ", max_dist_from_root - distance - n->dist, limit);
+
+    if ((max_dist_from_root - distance - n->dist) <= limit) {
+        puts("yes");
+        printf("\tchecking for topology prefix...\n");
+        printf("\t\tself topology prefix:\n\t\t\t");
+        int *ip, *jp;
+        for (ip = self_topology_prefix->array; ip != self_topology_prefix->last; ++ip) {
+            printf("%d", *ip);
+        }
+        printf("\n");
+        printf("\t\tspecies topology prefix:\n\t\t\t");
+
+        for (jp = topology_prefix->array; jp != topology_prefix->last; ++jp) {
+            printf("%d", *jp);
+        }
+        printf("\n");
+
+        int is_subset = 0;
+        for (ip = self_topology_prefix->array, jp = topology_prefix->array;
+                ip != self_topology_prefix->last && jp != topology_prefix->last;
+                ++ip, ++jp) {
+            if (*ip != *jp) {
+                is_subset = 0;
+                break;
+            }
+        }
+
+        if (is_subset) printf("subset!\n"); else printf("not subset!\n");
+
+        if (is_subset) return exit_branches_count + 1;
+    } else puts("no");
+
+    int child_idx;
+    for (p = n->child, child_idx = 0; p != NULL; p = p->next, ++child_idx) {
+        append_int_array(self_topology_prefix, child_idx);
+        exit_branches_count += do_get_exit_branches(p->node, limit, distance + n->dist, topology_prefix, self_topology_prefix, max_dist_from_root);
+        // remove topology index once the sub-tree has been walked
+        --(self_topology_prefix->last);
+    }
+
+    return exit_branches_count;
+}
+
+int get_exit_branches(newick_node *n, float distance, int_array *topology_prefix, float max_dist_from_root) {
+    int_array self_topology_prefix;
+    init_int_array(&self_topology_prefix);
+    int exit_branches_count = do_get_exit_branches(n, distance, 0.f, topology_prefix, &self_topology_prefix, max_dist_from_root);
+    free(self_topology_prefix.array);
+    return exit_branches_count;
+}
+
+void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, float start_interval, float end_interval, float max_root_distance) {
+    //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
+    float dist = max_root_distance - get_distance_from_root(n);
+    if (dist >= start_interval && dist < end_interval) {
+        append_newick_node_ptr_array(arr, n);
+    }
+
+    newick_child *p;
+    for (p = n->child; p != NULL; p = p->next) {
+        add_nodes_in_interval(arr, n, start_interval, end_interval, max_root_distance);
+    }
 }
 
 void do_bead_tree(newick_node *t, float distance, float_array *speciation_distances, float max_dist_from_root) {
@@ -379,11 +503,7 @@ int get_species_node_id_for_taxon(newick_node *n, char *t) {
     return id;
 }
 
-float get_distance_from_root(newick_node *n) {
-    float dist = n->dist;
-    if (n->parent != NULL) dist += get_distance_from_root(n->parent);
-    return dist;
-}
+
 
 char_ptr_array *get_all_descedants_taxa(newick_node *n) {
     newick_child *p;
@@ -742,26 +862,72 @@ int main(int argc, char **argv) {
     }
 
 #ifndef NDEBUG
-        printf("\n\ng array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
-        for (ip = g.array; ip != g.last; ++ip) {
-            printf("\tg[%d]:%d\n", ip - g.array, *ip);
-        }
+    printf("\n\ng array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    for (ip = g.array; ip != g.last; ++ip) {
+        printf("\tg[%d]:%d\n", ip - g.array, *ip);
+    }
 #endif
-    printf("small hash test\n");
-    float f = 32.5f;
-    hash_table *xtab = htab_get_new();
-    htab_insert(xtab, (void *)&f, sizeof(f));
-    void *p = htab_lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
-    if (p != NULL) puts("found: expected");
-    else puts("not found: UNEXPECTED");
 
-    htab_remove(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
+    // alrighty-roo, lets' bead species tree!
+    bead_tree(species_tree, spec_dists, farthest_leaf_dist);
 
-    p = htab_lookup(xtab, (void*)&f, sizeof(f), (int(*)(const void*,const void*))flt_cmp);
-    if (p != NULL) puts("found: UNEXPECTED");
-    else puts("not found: expected");
-    htab_free_table(xtab);
+    newick_node_ptr_array_array Y;
+    init_newick_node_ptr_array_array(&Y);
+    for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+        //int_array cur_interval_nodes;
+        //init_int_array(&cur_interval_nodes);
+        newick_node_ptr_array cur_interval_nodes;
+        init_newick_node_ptr_array(&cur_interval_nodes);
+
+        int tau_idx = fp - spec_dists->array;
+        assert(i == tau_idx);
+        // species_tree is a beaded tree in here
+        add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
+
+        // get nodes for the current tau
+        append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
+    }
+/*
+    // let's allocate k[][][] array
+    int k_z_dim = 5, k_i_dim = 5, k_j_dim = 5;
+    int ***k_arr;
+    k_arr = (int ***) malloc(sizeof(int**)*k_i_dim);
+    for (i = k_i_dim; i < k_i_dim; ++i) {
+        *(k_arr + i) = (int**)malloc(sizeof(int*)*k_j_dim);
+        for (j = 0; j < k_j_dim; ++j) {
+            *(*(k_arr + i) + j) = (int *)malloc(sizeof(int)*k_z_dim);
+        }
+    }
+*/
+
+    // k[][][] array
+    int speciation_count = spec_dists->last - spec_dists->array; // this is i dimension
+    coalescence_count = get_tree_coalescence_count(gene_tree);   // this is j dimension
+
+    int z;
+    int_array_array_array K;
+    init_int_array_array_array(&K);
+    for (i = 0; i < speciation_count; ++i) {
+        int_array_array mtx_to_add;
+        for (j = 0; j < coalescence_count; ++j) {
+            int_array to_add;
+            for (z = 0; z < array_size(Y.array[i]); ++z) {
+                int int_to_add = 0;
+                append_int_array(&to_add, int_to_add);
+            }
+            append_int_array_array(&mtx_to_add, to_add);
+        }
+        append_int_array_array_array(&K, mtx_to_add);
+    }
+
+    for (i = 2; i < speciation_count; ++i) {
+        for (z = 0; z < array_size(Y.array[i]); ++z) {
+            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+        }
+    }
 
     lca_end();
+    monitored_memory_end();
     return 0;
 }

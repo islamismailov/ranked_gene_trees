@@ -28,12 +28,10 @@ newick_node* parseTree(char *str)
 			}
 			pcCurrent++;
 		}
-		//node = (newick_node*)monitored_malloc(sizeof(newick_node));
 		node = (newick_node *) monitored_calloc(sizeof(newick_node), 1);
 		if (pcColon == NULL)
 		{
 			// Taxon only
-			//node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
 		    node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 		}
@@ -41,7 +39,6 @@ newick_node* parseTree(char *str)
 		{
 			// Taxon
 			*pcColon = '\0';
-			//node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
 			node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcColon = ':';
@@ -54,7 +51,6 @@ newick_node* parseTree(char *str)
 	else
 	{
 		// Create node
-		//node = (newick_node*)monitored_malloc(sizeof(newick_node));
 		node = (newick_node *) monitored_calloc(sizeof(newick_node), 1);
 		child = NULL;
 		// Search for all child nodes
@@ -92,14 +88,12 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-						//node->child = (newick_child*)monitored_malloc(sizeof(newick_child));
 					    node->child = (newick_child *) monitored_calloc(sizeof(newick_child), 1);
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-						//child->next = (newick_child*)monitored_malloc(sizeof(newick_child));
 						child->next = (newick_child *) monitored_calloc(sizeof(newick_child), 1);
 						node->childNum++;
 						child = child->next;
@@ -135,14 +129,12 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-						//node->child = (newick_child*)monitored_malloc(sizeof(newick_child));
 					    node->child = (newick_child *) monitored_calloc(sizeof(newick_child),1);
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-						//child->next = (newick_child*)monitored_malloc(sizeof(newick_child));
 					    child->next = (newick_child *) monitored_calloc(sizeof(newick_child),1);
 						node->childNum++;
 						child = child->next;
@@ -182,7 +174,6 @@ newick_node* parseTree(char *str)
 			}
 			cTemp = *pcCurrent;
 			*pcCurrent = '\0';
-			//node->taxon = (char *) monitored_malloc(strlen(pcStart) + 1);
 			node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcCurrent = cTemp;
@@ -256,14 +247,12 @@ newick_bin_node* parseBinaryTree(char *str) {
             }
             pcCurrent++;
         }
-        //node = (newick_bin_node *)monitored_malloc(sizeof(newick_bin_node));
         node = (newick_bin_node *)monitored_calloc(sizeof(newick_bin_node), 1);
         node->parent = node->left_child = node->right_child = NULL;
 
         if (pcColon == NULL)
         {
             // Taxon only
-            //node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
             node->taxon = (char*)monitored_calloc(sizeof(char), strlen(pcStart) + 1);
             memcpy(node->taxon, pcStart, strlen(pcStart));
         }
@@ -271,7 +260,6 @@ newick_bin_node* parseBinaryTree(char *str) {
         {
             // Taxon
             *pcColon = '\0';
-            //node->taxon = (char*)monitored_malloc(strlen(pcStart) + 1);
             node->taxon = (char*)monitored_calloc(sizeof(char), strlen(pcStart) + 1);
             memcpy(node->taxon, pcStart, strlen(pcStart));
             *pcColon = ':';
@@ -283,7 +271,6 @@ newick_bin_node* parseBinaryTree(char *str) {
     else
     {
         // Create node
-        node = (newick_bin_node*)monitored_malloc(sizeof(newick_bin_node));
         node = (newick_bin_node*)monitored_calloc(sizeof(newick_bin_node), 1);
         node->parent = node->left_child = node->right_child = NULL;
 
@@ -399,7 +386,6 @@ newick_bin_node* parseBinaryTree(char *str) {
             }
             cTemp = *pcCurrent;
             *pcCurrent = '\0';
-            //node->taxon = (char *) monitored_malloc(strlen(pcStart) + 1);
             node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
             memcpy(node->taxon, pcStart, strlen(pcStart));
             *pcCurrent = cTemp;

@@ -21,6 +21,7 @@ int flt_cmp_desc(float *a, float *b) {
     return 0;
 }
 
+/*
 int init_float_array(float_array *a) {
     size_t size = 16;
     a->array = (float *) malloc(size * sizeof(float));
@@ -74,3 +75,4 @@ int append_int_array(int_array *a, int val) {
 void clear_int_array(int_array *a) {
     a->last = a->array;
 }
+*/
