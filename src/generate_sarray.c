@@ -892,12 +892,29 @@ int main(int argc, char **argv) {
         init_newick_node_ptr_array(&cur_interval_nodes);
 
         // species_tree is a beaded tree in here
-        printf("add nodes in interval [%f, %f)", *(fp + 1), *fp); puts("");
+        printf("add nodes in interval [%f, %f)", *(fp + 1), *fp);
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
 
         // get nodes for the current tau
         append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
     }
+
+    int_array m;
+    init_int_array(&m);
+    for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+        int coalescence_events_count = 0;
+        for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
+            float dist = farthest_leaf_dist - get_distance_from_root(n2i->node);
+            for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+                if (dist >= *(fp + 1) && dist < *fp) {
+                    ++coalescence_events_count;
+                }
+            }
+        }
+        append_int_array(&m, coalescence_events_count);
+        printf("%d coalescence events in interval [%f, %f)", coalescence_events_count, *(fp + 1), *fp);
+    }
+
 /*
     // let's allocate k[][][] array
     int k_z_dim = 5, k_i_dim = 5, k_j_dim = 5;
@@ -933,7 +950,7 @@ int main(int argc, char **argv) {
         append_int_array_array_array(&K, mtx_to_add);
     }
 
-    for (i = 2; i < speciation_count; ++i) {
+    for (i = 1; i < speciation_count; ++i) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
             K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
