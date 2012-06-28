@@ -259,13 +259,20 @@ int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_
 int do_get_exit_branches(newick_node *n, float limit, float distance, int_array *topology_prefix, int_array *self_topology_prefix, float max_dist_from_root) {
     int exit_branches_count = 0;
     newick_child *p;
+
+#ifndef NDEBUG
     printf("\t%f <= %f? ", max_dist_from_root - distance - n->dist, limit);
+#endif
 
     if ((max_dist_from_root - distance - n->dist) <= limit) {
+
+#ifndef NDEBUG
         puts("yes");
         printf("\tchecking for topology prefix...\n");
         printf("\t\tself topology prefix:\n\t\t\t");
+#endif
         int *ip, *jp;
+#ifndef NDEBUG
         for (ip = self_topology_prefix->array; ip != self_topology_prefix->last; ++ip) {
             printf("%d", *ip);
         }
@@ -276,7 +283,7 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
             printf("%d", *jp);
         }
         printf("\n");
-
+#endif
         int is_subset = 0;
         for (ip = self_topology_prefix->array, jp = topology_prefix->array;
                 ip != self_topology_prefix->last && jp != topology_prefix->last;
@@ -286,11 +293,15 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
                 break;
             }
         }
-
+#ifndef NDEBUG
         if (is_subset) printf("subset!\n"); else printf("not subset!\n");
-
+#endif
         if (is_subset) return exit_branches_count + 1;
-    } else puts("no");
+    } else {
+#ifndef NDEBUG
+        puts("no");
+#endif
+    }
 
     int child_idx;
     for (p = n->child, child_idx = 0; p != NULL; p = p->next, ++child_idx) {
@@ -320,7 +331,7 @@ void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, float sta
 
     newick_child *p;
     for (p = n->child; p != NULL; p = p->next) {
-        add_nodes_in_interval(arr, n, start_interval, end_interval, max_root_distance);
+        add_nodes_in_interval(arr, p->node, start_interval, end_interval, max_root_distance);
     }
 }
 
@@ -334,7 +345,8 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
     start_interval = max_dist_from_root - (distance + t->dist);
     for (p = t->child; p != NULL; ) {
-        do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
+        do_bead_tree(p->node, distance + t->dist, speciation_distances, max_dist_from_root); //do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
+
         // find if there are any speciation times in between this node and it's child
         end_interval = max_dist_from_root - (distance + t->dist + p->node->dist);
 
@@ -879,9 +891,8 @@ int main(int argc, char **argv) {
         newick_node_ptr_array cur_interval_nodes;
         init_newick_node_ptr_array(&cur_interval_nodes);
 
-        int tau_idx = fp - spec_dists->array;
-        assert(i == tau_idx);
         // species_tree is a beaded tree in here
+        printf("add nodes in interval [%f, %f)", *(fp + 1), *fp); puts("");
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
 
         // get nodes for the current tau
