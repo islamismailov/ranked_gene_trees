@@ -920,8 +920,10 @@ int main(int argc, char **argv) {
     init_int_array_array_array(&K);
     for (i = 0; i < speciation_count; ++i) {
         int_array_array mtx_to_add;
+        init_int_array_array(&mtx_to_add);
         for (j = 0; j < coalescence_count; ++j) {
             int_array to_add;
+            init_int_array(&to_add);
             for (z = 0; z < array_size(Y.array[i]); ++z) {
                 int int_to_add = 0;
                 append_int_array(&to_add, int_to_add);
