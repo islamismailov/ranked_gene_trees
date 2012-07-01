@@ -11,21 +11,21 @@ void monitored_memory_init() {
 
 void *monitored_malloc(size_t size) {
     void *p = malloc(size);
-    htab_do_insert(mem_tab, p, (size_t)p); // use address as a hash value
+    htab_do_insert(mem_tab, p, (size_t)p, p); // use address as a hash value
     return p;
 }
 
 void *monitored_calloc(size_t n, size_t size) {
     void *p = calloc(n, size);
-    htab_do_insert(mem_tab, p, (size_t)p); // use address as a hash value
+    htab_do_insert(mem_tab, p, (size_t)p, p); // use address as a hash value
     return p;
 }
 
 void *monitored_realloc(void *p, size_t size) {
     void *realloc_p = realloc (p, size);
     if (realloc_p != p) {
-        htab_do_remove(mem_tab, p, (size_t) p, (__compar_fn_t) compar_int);
-        htab_do_insert(mem_tab, realloc_p, (size_t)realloc_p);  // use address as a hash value
+        htab_do_remove(mem_tab, p, (size_t) p, (__compar_fn_t) compar_addr);
+        htab_do_insert(mem_tab, realloc_p, (size_t)realloc_p, p);  // use address as a hash value
     }
     return realloc_p;
 }
@@ -40,9 +40,9 @@ void monitored_free_all() { // free memory for each element in hash table, and r
     for (i = 0; i < HASH_PRIMES[mem_tab->capacity_idx]; ++i) {
         iter = mem_tab->elements[i];
         while (iter != NULL) {
-            htab_do_insert(mem_tab, iter->ptr, iter->h_val);
+            htab_do_insert(mem_tab, iter->key, iter->hash_key, iter->val);
             iter_next = iter->next;
-            free(iter->ptr);
+            free(iter->val);
             free(iter);
             iter = iter_next;
         }

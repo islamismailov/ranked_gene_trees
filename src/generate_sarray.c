@@ -38,10 +38,6 @@ int node2float_cmp(node2float *a, node2float *b) {
     return 0;
 }
 
-int addr_cmp(void *a, void *b) {
-    return a - b;
-}
-
 typedef char * char_ptr;
 typedef int * int_ptr;
 typedef int ** int_ptr_ptr;
@@ -277,7 +273,7 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
 #ifndef NDEBUG
         puts("yes");
         printf("\tchecking for topology prefix...\n");
-        printf("\t\tself topology prefix:\n\t\t\t");
+        printf("\t\tself topology prefix: ");
 #endif
         int *ip, *jp;
 #ifndef NDEBUG
@@ -285,12 +281,11 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
             printf("%d", *ip);
         }
         printf("\n");
-        printf("\t\tspecies topology prefix:\n\t\t\t");
+        printf("\t\tspec topology prefix: ");
 
         for (jp = topology_prefix->array; jp != topology_prefix->last; ++jp) {
             printf("%d", *jp);
-        }
-        printf("\n");
+        }   
 #endif
         int is_subset = 1;
         for (ip = self_topology_prefix->array, jp = topology_prefix->array;
@@ -302,7 +297,7 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
             }
         }
 #ifndef NDEBUG
-        if (is_subset) printf("subset!\n"); else printf("not subset!\n");
+        if (is_subset) printf("\tsubset!\n"); else printf("\tnot subset!\n");
 #endif
         if (is_subset) return exit_branches_count + 1;
     } else {
@@ -334,11 +329,11 @@ void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, float sta
     //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
     float root_dist = get_distance_from_root(n);
     float dist = max_root_distance - root_dist;
-    printf("\tnode@%p with dist %f (maxrootdist %f - rootdist %f", n, dist, max_root_distance, root_dist);
+    //printf("\tnode@%p with dist %f (maxrootdist %f - rootdist %f", n, dist, max_root_distance, root_dist);
     if (dist >= start_interval && dist < end_interval) {
-        printf(" INSIDE\n");
+    //    printf(" INSIDE\n");
         append_newick_node_ptr_array(arr, n);
-    } else printf(" OUTSIDE\n");
+    }// else printf(" OUTSIDE\n");
 
     newick_child *p;
     for (p = n->child; p != NULL; p = p->next) {
@@ -939,8 +934,11 @@ int main(int argc, char **argv) {
         for (j = 0; j < array_size(cur_interval_nodes); ++j) {
             matidx *indices = (matidx *) malloc(sizeof(matidx));
             indices->i = i, indices->j = j;
-            htab_do_insert(mat_idx_tab, indices, htab_hash(cur_interval_nodes.array[j], sizeof(newick_node_ptr)));
-            printf("mapped node@%p to <%d,%d>\n", cur_interval_nodes.array[j], i, j);
+            htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
+#ifndef NDEBUG
+            hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
+            printf("mapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
+#endif
         }
 
         // get nodes for the current tau
@@ -1027,8 +1025,12 @@ int main(int argc, char **argv) {
             newick_child *p;
             for (p = Y.array[i].array[z]->child; p != NULL; p = p->next) {
                 // we need to get i,j indices of p->node
-                matidx *indices = (matidx *)htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), (__compar_fn_t) addr_cmp);
-                assert(indices != NULL);
+
+                matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
+
+                hash_t h_val = htab_hash(p->node, sizeof(newick_node));
+                printf("looking up node@%p: found object@%p with hash %llu\n", p->node, indices, h_val);
+                if (indices == NULL) continue;
                 printf("mapped <%d,%d> retrieved from node@%p\n", indices->i, indices->j, p->node);
             }
 //            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 int compar_int(int *a, int *b);
+int compar_addr(const void *a, const void *b);
 
 typedef unsigned long long hash_t;
 
@@ -12,14 +13,14 @@ typedef unsigned long long hash_t;
 typedef int(*   __compar_fn_t )(const void *, const void *);
 #endif
 
-extern unsigned long long HASH_PRIME;
+extern hash_t HASH_PRIME;
 
 extern size_t HASH_PRIMES[];
 
 typedef struct hash_tab_element {
-    void *ptr; // void *val;
     void *key;
-    unsigned long long h_val;
+    void *val;
+    hash_t hash_key;
     struct hash_tab_element *next;
 } hash_tab_element;
 
@@ -32,14 +33,18 @@ typedef struct hash_table {
 } hash_table;
 
 unsigned long long htab_hash(void *p, size_t len_bytes);
+
 hash_table *htab_get_new(/*size_t capacity*/);
-void htab_insert(hash_table *hash, void *p, size_t len_bytes);
-void htab_insert_ex(hash_table *hash, void *p, void *k, size_t k_len_bytes);
-void htab_do_insert(hash_table *table, void *p, unsigned long long h_val);
-void *htab_do_lookup(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar);
-void *htab_lookup(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar);
-void htab_do_remove(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar);
-void htab_remove(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar);
+
+void htab_do_insert(hash_table *table, void *key, hash_t hash_key, void *val);
+void htab_insert(hash_table *table, void *key, size_t len_bytes, void *val);
+
+void *htab_do_lookup(hash_table *table, void *key, hash_t hash_key, __compar_fn_t __compar);
+void *htab_lookup(hash_table *table, void *key, size_t len_bytes, __compar_fn_t __compar);
+
+void htab_do_remove(hash_table *table, void *key, hash_t hash_key, __compar_fn_t __compar);
+void htab_remove(hash_table *table, void *key, size_t len_bytes, __compar_fn_t __compar);
+
 void htab_free_table(hash_table *hash);
 
 #endif
