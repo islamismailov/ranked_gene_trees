@@ -123,7 +123,7 @@ void htab_free_table(hash_table *table) {
     for (i = 0; i < HASH_PRIMES[table->capacity_idx]; ++i) {
         iter = table->elements[i];
         while (iter != NULL) {
-            htab_do_insert(table, iter->ptr, iter->h_val);
+            //htab_do_insert(table, iter->ptr, iter->h_val);
             iter_next = iter->next;
             free(iter);
             iter = iter_next;

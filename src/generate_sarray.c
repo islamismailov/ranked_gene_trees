@@ -880,8 +880,13 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    // alrighty-roo, lets' bead species tree!
     bead_tree(species_tree, spec_dists, farthest_leaf_dist);
+
+    struct matidx {
+        int i, j;
+    };
+
+    hash_table *mat_idx_tab = htab_get_new();
 
     newick_node_ptr_array_array Y;
     init_newick_node_ptr_array_array(&Y);
@@ -895,6 +900,15 @@ int main(int argc, char **argv) {
         printf("add nodes in interval [%f, %f)", *(fp + 1), *fp);
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
 
+        //index each node in a hashtable
+        int i = fp - spec_dists->array, j;
+        for (j = 0; j < array_size(cur_interval_nodes); ++j) {
+            struct matidx *indeces = (struct matidx *)malloc(sizeof(struct matidx));
+            indeces->i = i;
+            indeces->j = j;
+            htab_insert(mat_idx_tab, indeces, sizeof(struct maxidx));
+        }
+
         // get nodes for the current tau
         append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
     }
@@ -904,11 +918,10 @@ int main(int argc, char **argv) {
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
         int coalescence_events_count = 0;
         for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
+            // TODO: optimize: no need to call get_distance_from_root all the time
             float dist = farthest_leaf_dist - get_distance_from_root(n2i->node);
-            for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
-                if (dist >= *(fp + 1) && dist < *fp) {
-                    ++coalescence_events_count;
-                }
+            if (dist >= *(fp + 1) && dist < *fp) {
+                ++coalescence_events_count;
             }
         }
         append_int_array(&m, coalescence_events_count);
@@ -952,6 +965,18 @@ int main(int argc, char **argv) {
 
     for (i = 1; i < speciation_count; ++i) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
+            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+        }
+    }
+
+    for (i = 1; i < speciation_count; ++i) {
+        for (z = 0; z < array_size(Y.array[i]); ++z) {
+            K.array[i][m[i]][z] = 0;
+            newick_child *p;
+            for (p = Y.array[i].array[j].child; p != NULL; p = p->next) {
+                //find p->node indices arrgh!!!
+            }
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
             K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
