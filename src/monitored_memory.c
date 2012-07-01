@@ -15,7 +15,7 @@ void *monitored_malloc(size_t size) {
     return p;
 }
 
-void *monitored_calloc(size_t size, size_t n) {
+void *monitored_calloc(size_t n, size_t size) {
     void *p = calloc(n, size);
     htab_do_insert(mem_tab, p, (size_t)p); // use address as a hash value
     return p;

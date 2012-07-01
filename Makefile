@@ -1,11 +1,11 @@
 # $ make
 # $ make install (copy into bin directory)
 
-CC = gcc
-LINK = gcc
+CC = clang
+LINK = clang
 INSTALL = install
 
-CFLAGS = -Wall -march=native -mtune=native -I../include -I. -ggdb # replace -ggdb for -O3 for release 
+CFLAGS = -Wall -march=native -mtune=native -I../include -I. # -ggdb for debug, -O3 for release 
 LFLAGS = -march=native -mtune=native
 
 GMPLIB = -L/usr/lib -lgmp 

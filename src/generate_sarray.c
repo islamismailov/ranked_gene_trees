@@ -15,6 +15,10 @@ float max(float x, float y) {
     return x > y? x : y;
 }
 
+typedef struct matidx {
+    int i, j;
+} matidx;
+
 typedef struct node2float {
     newick_node *node;
     float val;
@@ -32,6 +36,10 @@ int node2float_cmp(node2float *a, node2float *b) {
     else if (diff < -1e-6)  return -1;
 
     return 0;
+}
+
+int addr_cmp(void *a, void *b) {
+    return a - b;
 }
 
 typedef char * char_ptr;
@@ -173,7 +181,6 @@ void do_get_distance_array(newick_node *t, float distance, node2float_array *dis
     }
 }
 
-// TODO: remove later, used for debugging
 int get_tree_coalescence_count(newick_node *t) {
     int count = 0;
     newick_child *p;
@@ -235,6 +242,7 @@ int do_get_topology_prefix(int_array *x, newick_node *n, newick_node *target) {
 
 int_array get_topology_prefix(newick_node *n, newick_node *target) {
     int_array topology_prefix;
+    init_int_array(&topology_prefix);
     do_get_topology_prefix(&topology_prefix, n, target);
     return topology_prefix;
 }
@@ -284,7 +292,7 @@ int do_get_exit_branches(newick_node *n, float limit, float distance, int_array 
         }
         printf("\n");
 #endif
-        int is_subset = 0;
+        int is_subset = 1;
         for (ip = self_topology_prefix->array, jp = topology_prefix->array;
                 ip != self_topology_prefix->last && jp != topology_prefix->last;
                 ++ip, ++jp) {
@@ -324,10 +332,13 @@ int get_exit_branches(newick_node *n, float distance, int_array *topology_prefix
 
 void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, float start_interval, float end_interval, float max_root_distance) {
     //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
-    float dist = max_root_distance - get_distance_from_root(n);
+    float root_dist = get_distance_from_root(n);
+    float dist = max_root_distance - root_dist;
+    printf("\tnode@%p with dist %f (maxrootdist %f - rootdist %f", n, dist, max_root_distance, root_dist);
     if (dist >= start_interval && dist < end_interval) {
+        printf(" INSIDE\n");
         append_newick_node_ptr_array(arr, n);
-    }
+    } else printf(" OUTSIDE\n");
 
     newick_child *p;
     for (p = n->child; p != NULL; p = p->next) {
@@ -343,12 +354,12 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
     float start_interval, end_interval;
 
-    start_interval = max_dist_from_root - (distance + t->dist);
+    end_interval = max_dist_from_root - (distance + t->dist);
     for (p = t->child; p != NULL; ) {
         do_bead_tree(p->node, distance + t->dist, speciation_distances, max_dist_from_root); //do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
 
         // find if there are any speciation times in between this node and it's child
-        end_interval = max_dist_from_root - (distance + t->dist + p->node->dist);
+        start_interval = max_dist_from_root - (distance + t->dist + p->node->dist);
 
         child = p;
         child_head = t->child;
@@ -358,21 +369,25 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
         for (fp = (speciation_distances->last - 1); fp != (speciation_distances->array - 1); --fp) {
             if (*fp > start_interval && *fp < end_interval) {
                 // delete son from the old node
-                if (child_head->next == p) {
+                if (child_head == child) {
                     child_head->next = child->next;
                 } else {
                     for (q = child_head; q != NULL; q = q->next) {
-                        if (q->next == p) break;
+                        if (q->next == child) break;
                     }
                     q->next = child->next;
                 }
+                printf("\t%f in interval <%f, %f>\n", *fp, start_interval, end_interval);
 
                 bead = (newick_node *) monitored_malloc(sizeof(newick_node));
-                bead->dist = *fp;
                 bead->child = child;
                 bead->child->node->parent = bead;
                 bead->childNum = 1;
                 bead->child->next = NULL;
+
+                float x = *fp - start_interval;
+                bead->dist = x;
+                child->node->dist -= x;
 
                 // now attach bead as one of t's children:
                 new_child = (newick_child *) monitored_malloc(sizeof(newick_child));
@@ -385,7 +400,7 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
                 child = new_child;
                 child_head = new_child;
-                end_interval = *fp;
+                start_interval = *fp;
             }
         }
     }
@@ -643,6 +658,16 @@ void parse_global_args(int argc, char **argv) {
     }
 }
 
+int check_tree_parent_references(newick_node *n) {
+    int status = 1;
+    newick_child *p;
+    for (p = n->child; p != NULL; p = p->next) {
+        status &= (p->node->parent == n && p->node->parent != NULL);
+        status &= check_tree_parent_references(p->node);
+    }
+    return status;
+}
+
 int main(int argc, char **argv) {
     newick_node *species_tree = NULL;
     newick_node *gene_tree = NULL;
@@ -670,6 +695,11 @@ int main(int argc, char **argv) {
 
     gene_tree = tree_from_file(globalArgs.geneTreeFileName);
     species_tree = tree_from_file(globalArgs.speciesTreeFileName);
+
+    if (check_tree_parent_references(species_tree) == 0) {
+        printf("BAD PARENTING\n");
+        return EXIT_FAILURE;
+    }
 
 #ifndef NDEBUG
     printf("\n\nGene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -734,7 +764,7 @@ int main(int argc, char **argv) {
 
 #ifndef NDEBUG
     for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
-        printf("\tnode@%p with node id %d and array index %d\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
+        printf("\tnode@%p with node id %d and array index %ld\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
     }
 #endif
 
@@ -870,22 +900,21 @@ int main(int argc, char **argv) {
             min_lineages += product;
         }
         append_int_array(&g, n - min_lineages);
-
     }
 
 #ifndef NDEBUG
     printf("\n\ng array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (ip = g.array; ip != g.last; ++ip) {
-        printf("\tg[%d]:%d\n", ip - g.array, *ip);
+        printf("\tg[%ld]:%d\n", ip - g.array, *ip);
     }
 #endif
 
+#ifndef NDEBUG
+    printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
     bead_tree(species_tree, spec_dists, farthest_leaf_dist);
 
-    struct matidx {
-        int i, j;
-    };
-
+    // this is node -> <i,j> mapping for Y array
     hash_table *mat_idx_tab = htab_get_new();
 
     newick_node_ptr_array_array Y;
@@ -897,22 +926,23 @@ int main(int argc, char **argv) {
         init_newick_node_ptr_array(&cur_interval_nodes);
 
         // species_tree is a beaded tree in here
-        printf("add nodes in interval [%f, %f)", *(fp + 1), *fp);
+        printf("add nodes in interval [%f, %f)\n", *(fp + 1), *fp);
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
 
         //index each node in a hashtable
         int i = fp - spec_dists->array, j;
         for (j = 0; j < array_size(cur_interval_nodes); ++j) {
-            struct matidx *indeces = (struct matidx *)malloc(sizeof(struct matidx));
-            indeces->i = i;
-            indeces->j = j;
-            htab_insert(mat_idx_tab, indeces, sizeof(struct maxidx));
+            matidx *indices = (matidx *) malloc(sizeof(matidx));
+            indices->i = i, indices->j = j;
+            htab_do_insert(mat_idx_tab, indices, htab_hash(cur_interval_nodes.array[j], sizeof(newick_node_ptr)));
+            printf("mapped node@%p to <%d,%d>\n", cur_interval_nodes.array[j], i, j);
         }
 
         // get nodes for the current tau
         append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
     }
 
+/*
     int_array m;
     init_int_array(&m);
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
@@ -925,8 +955,9 @@ int main(int argc, char **argv) {
             }
         }
         append_int_array(&m, coalescence_events_count);
-        printf("%d coalescence events in interval [%f, %f)", coalescence_events_count, *(fp + 1), *fp);
+        printf("%d coalescence events in interval [%f, %f)\n", coalescence_events_count, *(fp + 1), *fp);
     }
+*/  
 
 /*
     // let's allocate k[][][] array
@@ -940,7 +971,7 @@ int main(int argc, char **argv) {
         }
     }
 */
-
+/*
     // k[][][] array
     int speciation_count = spec_dists->last - spec_dists->array; // this is i dimension
     coalescence_count = get_tree_coalescence_count(gene_tree);   // this is j dimension
@@ -962,26 +993,36 @@ int main(int argc, char **argv) {
         }
         append_int_array_array_array(&K, mtx_to_add);
     }
-
+    
+    printf("speciation count: %d\n", speciation_count);
     for (i = 1; i < speciation_count; ++i) {
+
+        int arsize = Y.array[i].last - Y.array[i].array;
+        
+        assert(arsize == array_size(Y.array[i]));
+                printf("y[%d] has %ld elements\n", i, array_size((Y.array)[i]));
+        
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+            printf("run for spec_dists[%d]=%f\n", i-1, (spec_dists->array)[i - 1]);
             K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
     }
-
+/*
     for (i = 1; i < speciation_count; ++i) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
-            K.array[i][m[i]][z] = 0;
+            K.array[i].array[m.array[i]].array[z] = 0;
             newick_child *p;
-            for (p = Y.array[i].array[j].child; p != NULL; p = p->next) {
-                //find p->node indices arrgh!!!
+            for (p = Y.array[i].array[j]->child; p != NULL; p = p->next) {
+                // we need to get i,j indices of p->node
+                matidx *indices = (matidx *)htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), (__compar_fn_t) addr_cmp);
+                printf("mapped <%d,%d> retrieved from node@%p\n", indices->i, indices->j, p->node);
             }
-            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
-            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+//            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+//            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
     }
-
+*/
     lca_end();
     monitored_memory_end();
     return 0;

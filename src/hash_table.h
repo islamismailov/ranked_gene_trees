@@ -7,6 +7,11 @@ int compar_int(int *a, int *b);
 
 typedef unsigned long long hash_t;
 
+#ifndef __COMPAR_FN_T
+#define __COMPAR_FN_T
+typedef int(*   __compar_fn_t )(const void *, const void *);
+#endif
+
 extern unsigned long long HASH_PRIME;
 
 extern size_t HASH_PRIMES[];
@@ -31,6 +36,7 @@ hash_table *htab_get_new(/*size_t capacity*/);
 void htab_insert(hash_table *hash, void *p, size_t len_bytes);
 void htab_insert_ex(hash_table *hash, void *p, void *k, size_t k_len_bytes);
 void htab_do_insert(hash_table *table, void *p, unsigned long long h_val);
+void *htab_do_lookup(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar);
 void *htab_lookup(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar);
 void htab_do_remove(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar);
 void htab_remove(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar);

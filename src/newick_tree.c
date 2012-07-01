@@ -28,18 +28,18 @@ newick_node* parseTree(char *str)
 			}
 			pcCurrent++;
 		}
-		node = (newick_node *) monitored_calloc(sizeof(newick_node), 1);
+		node = (newick_node *) monitored_calloc(1, sizeof(newick_node));
 		if (pcColon == NULL)
 		{
 			// Taxon only
-		    node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+		    node->taxon = (char *) monitored_calloc(strlen(pcStart) + 1, sizeof(char));
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 		}
 		else
 		{
 			// Taxon
 			*pcColon = '\0';
-			node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+			node->taxon = (char *) monitored_calloc(strlen(pcStart) + 1, sizeof(char));
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcColon = ':';
 			// Distance
@@ -51,7 +51,7 @@ newick_node* parseTree(char *str)
 	else
 	{
 		// Create node
-		node = (newick_node *) monitored_calloc(sizeof(newick_node), 1);
+		node = (newick_node *) monitored_calloc(1, sizeof(newick_node));
 		child = NULL;
 		// Search for all child nodes
 		// Find all ',' until corresponding ')' is encountered
@@ -88,17 +88,18 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-					    node->child = (newick_child *) monitored_calloc(sizeof(newick_child), 1);
+					    node->child = (newick_child *) monitored_calloc(1, sizeof(newick_child));
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-						child->next = (newick_child *) monitored_calloc(sizeof(newick_child), 1);
+						child->next = (newick_child *) monitored_calloc(1, sizeof(newick_child));
 						node->childNum++;
 						child = child->next;
 					}
 					child->node = parseTree(pcStart);
+                    child->node->parent = node;
 					*pcCurrent = cTemp;
 					if (*pcCurrent != ')')
 					{
@@ -129,17 +130,19 @@ newick_node* parseTree(char *str)
 					// Create a child node
 					if (child == NULL)
 					{
-					    node->child = (newick_child *) monitored_calloc(sizeof(newick_child),1);
+					    node->child = (newick_child *) monitored_calloc(1, sizeof(newick_child));
 						node->childNum = 1;
 						child = node->child;
 					}
 					else
 					{
-					    child->next = (newick_child *) monitored_calloc(sizeof(newick_child),1);
+					    child->next = (newick_child *) monitored_calloc(1, sizeof(newick_child));
 						node->childNum++;
 						child = child->next;
 					}
 					child->node = parseTree(pcStart);
+                    child->node->parent = node;
+                    
 					*pcCurrent = cTemp;
 					if (*pcCurrent != ')')
 					{
@@ -174,7 +177,7 @@ newick_node* parseTree(char *str)
 			}
 			cTemp = *pcCurrent;
 			*pcCurrent = '\0';
-			node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+			node->taxon = (char *) monitored_calloc(strlen(pcStart) + 1, sizeof(char));
 			memcpy(node->taxon, pcStart, strlen(pcStart));
 			*pcCurrent = cTemp;
 			pcCurrent++;
@@ -247,20 +250,20 @@ newick_bin_node* parseBinaryTree(char *str) {
             }
             pcCurrent++;
         }
-        node = (newick_bin_node *)monitored_calloc(sizeof(newick_bin_node), 1);
+        node = (newick_bin_node *)monitored_calloc(1, sizeof(newick_bin_node));
         node->parent = node->left_child = node->right_child = NULL;
 
         if (pcColon == NULL)
         {
             // Taxon only
-            node->taxon = (char*)monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+            node->taxon = (char*)monitored_calloc(strlen(pcStart) + 1, sizeof(char));
             memcpy(node->taxon, pcStart, strlen(pcStart));
         }
         else
         {
             // Taxon
             *pcColon = '\0';
-            node->taxon = (char*)monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+            node->taxon = (char*)monitored_calloc(strlen(pcStart) + 1, sizeof(char));
             memcpy(node->taxon, pcStart, strlen(pcStart));
             *pcColon = ':';
             // Distance
@@ -271,7 +274,7 @@ newick_bin_node* parseBinaryTree(char *str) {
     else
     {
         // Create node
-        node = (newick_bin_node*)monitored_calloc(sizeof(newick_bin_node), 1);
+        node = (newick_bin_node*)monitored_calloc(1, sizeof(newick_bin_node));
         node->parent = node->left_child = node->right_child = NULL;
 
         // Search for all child nodes
@@ -386,7 +389,7 @@ newick_bin_node* parseBinaryTree(char *str) {
             }
             cTemp = *pcCurrent;
             *pcCurrent = '\0';
-            node->taxon = (char *) monitored_calloc(sizeof(char), strlen(pcStart) + 1);
+            node->taxon = (char *) monitored_calloc(strlen(pcStart) + 1, sizeof(char));
             memcpy(node->taxon, pcStart, strlen(pcStart));
             *pcCurrent = cTemp;
             pcCurrent++;

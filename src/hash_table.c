@@ -79,17 +79,20 @@ void htab_insert(hash_table *table, void *p, size_t len_bytes) {
     htab_do_insert(table, p, htab_hash(p, len_bytes));
 }
 
-void *htab_lookup(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar) {
+void *htab_do_lookup(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar) {
     hash_tab_element *iter;
-    unsigned long long h_val = htab_hash(p, len_bytes);
     size_t pos = h_val % HASH_PRIMES[table->capacity_idx];
-
+    
     for (iter = table->elements[pos]; iter != NULL; iter = iter->next) {
         if (__compar(p, iter->ptr) == 0) {
             return iter->ptr;
         }
     }
-    return NULL;
+    return NULL;    
+}
+
+void *htab_lookup(hash_table *table, void *p, size_t len_bytes, __compar_fn_t __compar) {
+    return htab_do_lookup(table, p, htab_hash(p, len_bytes), __compar);
 }
 
 void htab_do_remove(hash_table *table, void *p, hash_t h_val, __compar_fn_t __compar) {

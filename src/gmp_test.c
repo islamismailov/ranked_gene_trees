@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <gmp.h>
  
-int main(void)
+void gmp_test(void)
 {
     mpz_t x;
     mpz_t y;
@@ -22,6 +22,5 @@ int main(void)
     mpz_clear(x);
     mpz_clear(y);
     mpz_clear(result);
-    return EXIT_SUCCESS;
 }
 
