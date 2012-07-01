@@ -1028,10 +1028,14 @@ int main(int argc, char **argv) {
 
                 matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
 
-                hash_t h_val = htab_hash(p->node, sizeof(newick_node));
-                printf("looking up node@%p: found object@%p with hash %llu\n", p->node, indices, h_val);
+                printf("child@%p of K[%d][m[%d]][%d] (K[%d][%d][%d]): ", p->node, i, i, z, i, m.array[i], z);
+                if (indices != NULL) {
+                    printf("index     FOUND: ");
+                } else {
+                    printf("index NOT FOUND\n");
+                }
                 if (indices == NULL) continue;
-                printf("mapped <%d,%d> retrieved from node@%p\n", indices->i, indices->j, p->node);
+                printf("<%d,%d>\n", indices->i, indices->j);
             }
 //            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
 //            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
