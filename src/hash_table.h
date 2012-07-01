@@ -13,9 +13,9 @@ typedef unsigned long long hash_t;
 typedef int(*   __compar_fn_t )(const void *, const void *);
 #endif
 
-extern hash_t HASH_PRIME;
+extern const hash_t HASH_PRIME;
 
-extern size_t HASH_PRIMES[];
+extern const size_t HASH_PRIMES[];
 
 typedef struct hash_tab_element {
     void *key;

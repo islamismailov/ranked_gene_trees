@@ -9,10 +9,10 @@ int compar_addr(const void *a, const void *b) {
     return a - b;
 }
 
-unsigned long long HASH_PRIME = 1181783497276652981LL; // if c == 0      x_n = (h*x_n-1 +c) % 2^64
-//unsigned long long HASH_PRIME = 2862933555777941757LL; // if c is odd in x_n = (h*x_n-1 +c) % 2^64
+const hash_t HASH_PRIME = 1181783497276652981LL; // if c == 0      x_n = (h*x_n-1 +c) % 2^64
+//const hash_t HASH_PRIME = 2862933555777941757LL; // if c is odd in x_n = (h*x_n-1 +c) % 2^64
 
-size_t HASH_PRIMES[] = {
+const size_t HASH_PRIMES[] = {
          23,       47,       97,      193,       389,       769,      1543,      3079,       6151,
       12289,    24593,    49157,    98317,    196613,    393241,    786433,   1572869,    3145739,
     6291487, 12582929, 25165843, 50331683, 100663291, 201326557, 402653213, 805306339, 1610612747
