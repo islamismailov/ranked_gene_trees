@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
     gene_tree = tree_from_file(globalArgs.geneTreeFileName);
     species_tree = tree_from_file(globalArgs.speciesTreeFileName);
 
-    if (check_tree_parent_references(species_tree) == 0) {
+    if (check_tree_parent_references(species_tree) == 0 || check_tree_parent_references(gene_tree) == 0) {
         printf("BAD PARENTING\n");
         return EXIT_FAILURE;
     }
@@ -913,6 +913,11 @@ int main(int argc, char **argv) {
     printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     bead_tree(species_tree, spec_dists, farthest_leaf_dist);
+    
+    
+#ifndef NDEBUG
+    printf("\n\nY matrix:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
 
     // this is node -> <i,j> mapping for Y array
     hash_table *mat_idx_tab = htab_get_new();
@@ -942,7 +947,10 @@ int main(int argc, char **argv) {
         append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
     }
 
-/*
+#ifndef NDEBUG
+    printf("\n\nm array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
     int_array m;
     init_int_array(&m);
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
@@ -957,7 +965,11 @@ int main(int argc, char **argv) {
         append_int_array(&m, coalescence_events_count);
         printf("%d coalescence events in interval [%f, %f)\n", coalescence_events_count, *(fp + 1), *fp);
     }
-*/  
+
+    
+#ifndef NDEBUG
+    printf("\n\nk array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
 
 /*
     // let's allocate k[][][] array
@@ -971,7 +983,7 @@ int main(int argc, char **argv) {
         }
     }
 */
-/*
+
     // k[][][] array
     int speciation_count = spec_dists->last - spec_dists->array; // this is i dimension
     coalescence_count = get_tree_coalescence_count(gene_tree);   // this is j dimension
@@ -1008,21 +1020,22 @@ int main(int argc, char **argv) {
             K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
     }
-/*
+    
     for (i = 1; i < speciation_count; ++i) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             K.array[i].array[m.array[i]].array[z] = 0;
             newick_child *p;
-            for (p = Y.array[i].array[j]->child; p != NULL; p = p->next) {
+            for (p = Y.array[i].array[z]->child; p != NULL; p = p->next) {
                 // we need to get i,j indices of p->node
                 matidx *indices = (matidx *)htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), (__compar_fn_t) addr_cmp);
+                assert(indices != NULL);
                 printf("mapped <%d,%d> retrieved from node@%p\n", indices->i, indices->j, p->node);
             }
 //            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
 //            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
     }
-*/
+
     lca_end();
     monitored_memory_end();
     return 0;
