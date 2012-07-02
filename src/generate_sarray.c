@@ -1010,7 +1010,7 @@ int main(int argc, char **argv) {
         int arsize = Y.array[i].last - Y.array[i].array;
         
         assert(arsize == array_size(Y.array[i]));
-                printf("y[%d] has %ld elements\n", i, array_size((Y.array)[i]));
+//        printf("y[%d] has %ld elements\n", i, array_size((Y.array)[i]));
         
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
@@ -1019,16 +1019,18 @@ int main(int argc, char **argv) {
         }
     }
     
-    for (i = 1; i < speciation_count; ++i) {
-        for (z = 0; z < array_size(Y.array[i]); ++z) {
+    for (i = 1; i < speciation_count - 1; ++i) {
+        printf("y[%d] has %ld elements\n", i - 1, array_size(Y.array[i - 1]));
+        for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
+            printf("\ty[%d][%d] has %d children:\n", i - 1, z, Y.array[i-1].array[z]->childNum);
             K.array[i].array[m.array[i]].array[z] = 0;
             newick_child *p;
-            for (p = Y.array[i].array[z]->child; p != NULL; p = p->next) {
+            for (p = Y.array[i - 1].array[z]->child; p != NULL; p = p->next) {
                 // we need to get i,j indices of p->node
 
                 matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
 
-                printf("child@%p of K[%d][m[%d]][%d] (K[%d][%d][%d]): ", p->node, i, i, z, i, m.array[i], z);
+                printf("\t\tchild@%p of K[%d][m[%d]][%d] (K[%d][%d][%d]) / Y[%d][%d]: ", p->node, i, i, z, i, m.array[i], z, i - 1, z);
                 if (indices != NULL) {
                     printf("index     FOUND: ");
                 } else {

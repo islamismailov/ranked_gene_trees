@@ -5,4 +5,23 @@ A polynomial-time algorithm has been described for computing probabilities of ra
 
 This project will provide an implementation of polynomial time algorithm to calculate the probability of a ranked gene tree topology for a given species tree.
 
+Indexing:
+
+s[] (speciation): same as in paper
+u[] (coalescence): 0-based (index as u[i-1])
+m[] (intervals in tau[i]): 0-based (index as m[i-1])
+gene_lineages (L[]): 0-based (index as gene_lineages[i-1])
+
+tau_idx indiсes are calculated from s[] (compatible)
+
+y[][] (beaded tree index): 0-based (index as y[i-1][j-1]) ?
+g[] array:
+k[][][] array:
+
+LCA:
+ *  equivalent node ids are fetched with taxa, and use s[] indices
+
+
+indexed species array is indexed with s[] indices
+
 You will need to install libgmp to use this code (apt-get install libgmp-dev)
