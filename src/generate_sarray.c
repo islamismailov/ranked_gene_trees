@@ -351,7 +351,7 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
     end_interval = max_dist_from_root - (distance + t->dist);
     for (p = t->child; p != NULL; ) {
-        do_bead_tree(p->node, distance + t->dist, speciation_distances, max_dist_from_root); //do_get_speciation_distances(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
+        do_bead_tree(p->node, distance + t->dist, speciation_distances, max_dist_from_root);
 
         // find if there are any speciation times in between this node and it's child
         start_interval = max_dist_from_root - (distance + t->dist + p->node->dist);
@@ -363,38 +363,39 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
         for (fp = (speciation_distances->last - 1); fp != (speciation_distances->array - 1); --fp) {
             if (*fp > start_interval && *fp < end_interval) {
-                // delete son from the old node
-                if (child_head == child) {
-                    child_head->next = child->next;
-                } else {
-                    for (q = child_head; q != NULL; q = q->next) {
-                        if (q->next == child) break;
-                    }
-                    q->next = child->next;
-                }
+
                 printf("\t%f in interval <%f, %f>\n", *fp, start_interval, end_interval);
 
                 bead = (newick_node *) monitored_malloc(sizeof(newick_node));
                 bead->child = child;
-                bead->child->node->parent = bead;
+                bead->parent = child->node->parent;
+                child->node->parent = bead;
                 bead->childNum = 1;
-                bead->child->next = NULL;
 
-                float x = *fp - start_interval;
-                bead->dist = x;
-                child->node->dist -= x;
+                bead->dist = end_interval - *fp;
+                child->node->dist = *fp - start_interval; // should've been end_interval - start_interval
 
                 // now attach bead as one of t's children:
                 new_child = (newick_child *) monitored_malloc(sizeof(newick_child));
                 new_child->node = bead;
-                new_child->next = t->child;
-                t->child = new_child;
-                bead->parent = t;
+                new_child->next = child->next;
 
-                // parents number of children stayed same
+                // we need to insert a bead right into the place where the old node was to keep the same topology
+                // (treat the previous node correctly)
+                if (child_head == child) {
+                    child_head = new_child;
+                } else {
+                    for (q = child_head; q != NULL; q = q->next) {
+                        if (q->next == child) break;
+                    }
+                    assert(q);
+                    q->next = new_child;
+                }
 
+                bead->child->next = NULL;
+
+                t->child = child_head;
                 child = new_child;
-                child_head = new_child;
                 start_interval = *fp;
             }
         }
@@ -697,7 +698,7 @@ int main(int argc, char **argv) {
     }
 
 #ifndef NDEBUG
-    printf("\n\nGene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\nGene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     printTree(gene_tree);
 
     printf("\n\nSpecies tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -739,9 +740,9 @@ int main(int argc, char **argv) {
     coalescence_array = get_coalescence_array(gene_tree);
 
 #ifndef NDEBUG
-    printf("\n\nCoalescence array (size %d):\n---- ---- ---- ---- ---- ---- ---- ----\n", coalescence_count);
+    printf("\n\nIndexed Coalescence array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-        printf("\tval:%d node@%p childnum:%d\n", n2i->val, n2i->node, n2i->node->childNum);
+        printf("\tnode@%p with node id %d(%ld array idx) childnum %d taxon %s\n", n2i->node, n2i->val, (n2i - coalescence_array->array), n2i->node->childNum, n2i->node->taxon);
     }
 #endif
 
@@ -759,7 +760,7 @@ int main(int argc, char **argv) {
 
 #ifndef NDEBUG
     for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
-        printf("\tnode@%p with node id %d and array index %ld\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array));
+        printf("\tnode@%p ith node id %d and array index %ld taxon %s\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array), n2i->node->taxon);
     }
 #endif
 
@@ -767,7 +768,7 @@ int main(int argc, char **argv) {
     // TODO: add m array
 
 #ifndef NDEBUG
-    printf("\n\nLCA:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nLCA preprocessing:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     lca_init(species_indexed_nodes->last - species_indexed_nodes->array, species_indexed_nodes);
 
