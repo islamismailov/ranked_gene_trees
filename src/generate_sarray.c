@@ -778,57 +778,7 @@ int main(int argc, char **argv) {
     init_int_array(equivalent_node_ids);
 
     int lca_idx;
-/*
-    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
 
-#ifndef NDEBUG
-        printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
-#endif
-        char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
-
-        clear_int_array(equivalent_node_ids);
-
-        int id;
-        char **taxon;
-        for (taxon = taxa->array; taxon != taxa->last; ++taxon) {
-            id = get_species_node_id_for_taxon(species_tree, *taxon);
-            if (id != -1) append_int_array(equivalent_node_ids, id);
-
-#ifndef NDEBUG
-            printf("\ttaxon:%s id:%d\n", *taxon == NULL ? "NULL" : *taxon, id);
-#endif
-        }
-
-#ifndef NDEBUG
-        printf("\n\nLCA search:\n---- ---- ---- ---- ---- ---- ---- ----\n");
-#endif
-
-        // now we need to find lowest common ancestor for these nodes
-        lca_idx = *(equivalent_node_ids->array);
-        for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
-            lca_idx = lca(lca_idx, *ip);
-
-#ifndef NDEBUG
-            printf("\tLCA(%d, %d): %d\n", lca_idx, *ip, lca_idx);
-#endif
-        }
-
-        // let's find tau interval for a given lowest common ancestor
-        // so that we need to calculate it's distance from the farthest leaf from the root
-        float lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
-        for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
-            if (lca_dist >= *(fp + 1) && lca_dist < *fp) {
-                break;
-            }
-        }
-
-        int tau_idx = fp - spec_dists->array;
-
-#ifndef NDEBUG
-        printf("---- ---- ---- ---- ---- ---- ---- ----\n\tOverall LCA id: %d with Tau index %d\n", lca_idx, tau_idx);
-#endif
-    }
-*/
     int_array g;
     init_int_array(&g);
 
@@ -912,7 +862,7 @@ int main(int argc, char **argv) {
     
     
 #ifndef NDEBUG
-    printf("\n\nY matrix:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
 
     // this is node -> <i,j> mapping for Y array
@@ -927,7 +877,9 @@ int main(int argc, char **argv) {
         init_newick_node_ptr_array(&cur_interval_nodes);
 
         // species_tree is a beaded tree in here
+#ifndef NDEBUG
         printf("add nodes in interval [%f, %f)\n", *(fp + 1), *fp);
+#endif
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
 
         //index each node in a hashtable
@@ -945,6 +897,15 @@ int main(int argc, char **argv) {
         // get nodes for the current tau
         append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
     }
+
+#ifndef NDEBUG
+    printf("\n\nY matrix:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    for (i = 0; i < array_size(Y); ++i) {
+        for (j = 0; j < array_size(Y.array[i]); ++j) {
+            printf("Y[%d][%d]: node@%p\n", i, j, Y.array[i].array[j]);
+        }
+    }
+#endif
 
 #ifndef NDEBUG
     printf("\n\nm array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -1020,6 +981,7 @@ int main(int argc, char **argv) {
         }
     }
     
+    // fill values for k[i][m[i]][z]
     for (i = 1; i < speciation_count - 1; ++i) {
         printf("y[%d] has %ld elements\n", i - 1, array_size(Y.array[i - 1]));
         for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
@@ -1027,21 +989,33 @@ int main(int argc, char **argv) {
             K.array[i].array[m.array[i]].array[z] = 0;
             newick_child *p;
             for (p = Y.array[i - 1].array[z]->child; p != NULL; p = p->next) {
-                // we need to get i,j indices of p->node
+                // we need to fetch i,j indices of p->node
 
                 matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
 
                 printf("\t\tchild@%p of K[%d][m[%d]][%d] (K[%d][%d][%d]) / Y[%d][%d]: ", p->node, i, i, z, i, m.array[i], z, i - 1, z);
                 if (indices != NULL) {
-                    printf("index     FOUND: ");
+                    printf("FOUND ");
                 } else {
-                    printf("index NOT FOUND\n");
+                    printf("FOUND\n");
                 }
                 if (indices == NULL) continue;
-                printf("<%d,%d>\n", indices->i, indices->j);
+                printf("at y[%d][%d]\n", indices->i, indices->j);
             }
 //            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
 //            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+        }
+    }
+    
+    for (i = 1; i < speciation_count - 1; ++i) {
+        for (j = m.array[i] - 1; j >= 0; --j) {
+            for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
+                if (j == 0) {
+                    K.array[i].array[j].array[z] = 0;
+                } else {
+                    K.array[i].array[j].array[z] = K.array[i].array[j+1].array[z];
+                }
+            }
         }
     }
 
