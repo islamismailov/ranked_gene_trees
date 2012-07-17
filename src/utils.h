@@ -6,13 +6,17 @@
 int flt_cmp(float *, float *);
 int flt_cmp_desc(float *, float *);
 
-#define DEF_ARRAY(ITEM_TYPE) \
-   typedef struct { \
-      ITEM_TYPE* array; \
-      ITEM_TYPE* last; \
-      ITEM_TYPE* end; \
-   } ITEM_TYPE##_array; \
-   \
+#define DEF_ARRAY_DECL(ITEM_TYPE)\
+    typedef struct { \
+        ITEM_TYPE* array; \
+        ITEM_TYPE* last; \
+        ITEM_TYPE* end; \
+    } ITEM_TYPE##_array; \
+    int init_##ITEM_TYPE##_array(ITEM_TYPE##_array *); \
+    int append_##ITEM_TYPE##_array(ITEM_TYPE##_array*, ITEM_TYPE); \
+    void clear_##ITEM_TYPE##_array(ITEM_TYPE##_array*); \
+
+#define DEF_ARRAY_IMPL(ITEM_TYPE) \
    int init_##ITEM_TYPE##_array(ITEM_TYPE##_array *a) { \
        size_t size = 16; \
        a->array = (ITEM_TYPE *) malloc(size * sizeof(ITEM_TYPE)); \
@@ -40,6 +44,10 @@ int flt_cmp_desc(float *, float *);
    void clear_##ITEM_TYPE##_array(ITEM_TYPE##_array* a) { \
        a->last = a->array; \
    } \
+
+#define DEF_ARRAY(ITEM_TYPE) \
+    DEF_ARRAY_DECL(ITEM_TYPE) \
+    DEF_ARRAY_IMPL(ITEM_TYPE) \
 
 #define clear_array(X) (X).last = (X).array;
 #define array_size(X) ((X).last - (X).array)

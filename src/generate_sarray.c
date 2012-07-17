@@ -6,28 +6,29 @@
 
 #include "newick_tree.h"
 
+#include "lca.h"
 #include "utils.h"
 #include "getopt.h"
 #include "hash_table.h"
 #include "monitored_memory.h"
+#include "generate_sarray.h"
+
+DEF_ARRAY_IMPL(int);
+DEF_ARRAY_IMPL(char);
+DEF_ARRAY_IMPL(float);
+
+DEF_ARRAY_IMPL(newick_node_ptr);
+DEF_ARRAY_IMPL(newick_node_ptr_array);
+
+DEF_ARRAY_IMPL(node2float);
+DEF_ARRAY_IMPL(node2int);
+DEF_ARRAY_IMPL(char_ptr);
+DEF_ARRAY_IMPL(int_array);
+DEF_ARRAY_IMPL(int_array_array);
 
 float max(float x, float y) {
     return x > y? x : y;
 }
-
-typedef struct matidx {
-    int i, j;
-} matidx;
-
-typedef struct node2float {
-    newick_node *node;
-    float val;
-} node2float;
-
-typedef struct node2int {
-    newick_node *node;
-    int val;
-} node2int;
 
 int node2float_cmp(node2float *a, node2float *b) {
     float diff = a->val - b->val;
@@ -37,25 +38,6 @@ int node2float_cmp(node2float *a, node2float *b) {
 
     return 0;
 }
-
-typedef char * char_ptr;
-typedef int * int_ptr;
-typedef int ** int_ptr_ptr;
-typedef int *** int_ptr_ptr_ptr;
-typedef newick_node * newick_node_ptr;
-
-DEF_ARRAY(int);
-DEF_ARRAY(char);
-DEF_ARRAY(float);
-
-DEF_ARRAY(newick_node_ptr);
-DEF_ARRAY(newick_node_ptr_array);
-
-DEF_ARRAY(node2float);
-DEF_ARRAY(node2int);
-DEF_ARRAY(char_ptr);
-DEF_ARRAY(int_array);
-DEF_ARRAY(int_array_array);
 
 float get_distance_from_root(newick_node *n) {
     float dist = n->dist;
@@ -512,58 +494,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
 
 
 
-int timer, n, l;
-int *tin, *tout;
-int **up;
 
-void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
-    int i, to;
-    node2int *cp;
-    newick_child *np;
-
-    tin[v] = ++timer;
-    up[v][0] = p;
-    for (i = 1; i <= l; ++i)
-        up[v][i] = up[up[v][i - 1]][i - 1];
-
-    // iterate through children of coalescence u[v]:
-
-    for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
-        printf("\titerating thru children of u[%d]@%p:\n", v, coalescence_array->array[v].node);
-        // find child's index (to)
-        for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
-            //if (cp->node == coalescence_array->array[v].node)
-            if (cp->node == np->node)
-                break;
-        }
-
-        printf("\tu[%d](u[%d])@%p is a child? ", to, cp->val, np->node);
-        if (to != p && to != coalescence_array->last - coalescence_array->array) {
-            puts("y");
-            lca_preprocess(coalescence_array, cp->val, v);
-        } else puts("n");
-    }
-
-    tout[v] = ++timer;
-}
-
-int upper(int a, int b) {
-    return tin[a] <= tin[b] && tout[a] >= tout[b];
-}
-
-int lca(int a, int b) {
-    int i;
-    if (upper(a, b)) return a;
-    if (upper(b, a)) return b;
-
-    for (i = l; i >= 0; --i) {
-        if (!upper(up[a][i], b)) {
-            a = up[a][i];
-        }
-    }
-
-    return up[a][0];
-}
 
 void do_get_all_descedants_taxa(newick_node *n, char_ptr_array *descedants_array_taxa) {
     newick_child *p;
@@ -618,28 +549,6 @@ int get_leaves_count(newick_node *n) {
         leaves_count += get_leaves_count(p->node);
     }
     return leaves_count;
-}
-
-void lca_init(int n, node2int_array *coalescence_array) {
-    int i;
-
-    tin = (int *) malloc(n * sizeof(int));
-    tout = (int *) malloc(n * sizeof(int));
-    up = (int **) malloc(n * sizeof(int *));
-
-    l = 1;
-    while ((1 << l) <= n)  ++l;
-    for (i = 0; i < n; ++i)  up[i] = (int *) malloc((l + 1) * sizeof(int));
-
-    lca_preprocess(coalescence_array, 0, 0);
-}
-
-void lca_end() {
-    int i;
-    free(tin);
-    free(tout);
-    for (i = 0; i < n; ++i) free(up[i]);
-    free(up);
 }
 
 newick_node *tree_from_file(const char *filename) {

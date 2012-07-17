@@ -37,8 +37,11 @@ $(OBJ)/newick_tree.o: $(SRC)/newick_tree.c
 $(OBJ)/getopt.o: $(SRC)/getopt.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
+$(OBJ)/lca.o: $(SRC)/lca.c
+	$(CC) $(CFLAGS) -o $@ -c $^
+
 # Build binaries
-$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o
+$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o $(OBJ)/lca.o
 	$(LINK) $(LFLAGS) -o $@ $^
 
 ensure_dirs:
