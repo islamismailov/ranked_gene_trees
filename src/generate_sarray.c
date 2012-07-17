@@ -346,6 +346,13 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
 
     newick_node *bead;
     newick_child *p, *q, *child, *child_head, *new_child;
+    
+    // if a node is a leaf, we need to extend it so it's distance from root = max_dist_from_root
+    float root_dist = distance + t->dist;
+    assert(root_dist >= 0);
+    if (t->childNum == 0 && root_dist < max_dist_from_root) {
+        t->dist += max_dist_from_root - root_dist;
+    }
 
     float start_interval, end_interval;
 
@@ -371,6 +378,7 @@ void do_bead_tree(newick_node *t, float distance, float_array *speciation_distan
                 bead->parent = child->node->parent;
                 child->node->parent = bead;
                 bead->childNum = 1;
+                bead->taxon = "bead";
 
                 bead->dist = end_interval - *fp;
                 child->node->dist = *fp - start_interval; // should've been end_interval - start_interval
@@ -433,6 +441,66 @@ node2int_array *get_indexed_array(newick_node *t) {
     }
 
     return nodes_array;
+}
+
+void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y, float_array *spec_dists, newick_node *species_tree, float farthest_leaf_dist) {
+    int i, j;
+    float *fp;
+    
+    for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
+        //int_array cur_interval_nodes;
+        //init_int_array(&cur_interval_nodes);
+        newick_node_ptr_array cur_interval_nodes;
+        init_newick_node_ptr_array(&cur_interval_nodes);
+        
+        // species_tree is a beaded tree in here
+#ifndef NDEBUG
+        printf("add nodes in interval [%f, %f)\n", *(fp + 1), *fp);
+#endif
+        add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
+        
+        //index each node in a hashtable
+        int i = fp - spec_dists->array, j;
+        for (j = 0; j < array_size(cur_interval_nodes); ++j) {
+            matidx *indices = (matidx *) malloc(sizeof(matidx));
+            indices->i = i, indices->j = j;
+            htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
+#ifndef NDEBUG
+            hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
+            printf("mapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
+#endif
+        }
+        // get nodes for the current tau
+        append_newick_node_ptr_array_array(Y, cur_interval_nodes);
+    }
+    
+    // one more iteration
+    
+    //int_array cur_interval_nodes;
+    //init_int_array(&cur_interval_nodes);
+    newick_node_ptr_array cur_interval_nodes;
+    init_newick_node_ptr_array(&cur_interval_nodes);
+    
+    // species_tree is a beaded tree in here
+#ifndef NDEBUG
+    printf("add nodes in interval [%f, %f)\n", 0.f, *fp);
+#endif
+    add_nodes_in_interval(&cur_interval_nodes, species_tree, 0.f, *fp, farthest_leaf_dist);
+    
+    //index each node in a hashtable
+    i = fp - spec_dists->array;
+    for (j = 0; j < array_size(cur_interval_nodes); ++j) {
+        matidx *indices = (matidx *) malloc(sizeof(matidx));
+        indices->i = i, indices->j = j;
+        htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
+#ifndef NDEBUG
+        hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
+        printf("mapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
+#endif
+    }
+    // get nodes for the current tau
+    append_newick_node_ptr_array_array(Y, cur_interval_nodes);
+    
 }
 
 
@@ -864,45 +932,18 @@ int main(int argc, char **argv) {
 #ifndef NDEBUG
     printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
-
+    
     // this is node -> <i,j> mapping for Y array
     hash_table *mat_idx_tab = htab_get_new();
-
     newick_node_ptr_array_array Y;
     init_newick_node_ptr_array_array(&Y);
-    for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
-        //int_array cur_interval_nodes;
-        //init_int_array(&cur_interval_nodes);
-        newick_node_ptr_array cur_interval_nodes;
-        init_newick_node_ptr_array(&cur_interval_nodes);
-
-        // species_tree is a beaded tree in here
-#ifndef NDEBUG
-        printf("add nodes in interval [%f, %f)\n", *(fp + 1), *fp);
-#endif
-        add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
-
-        //index each node in a hashtable
-        int i = fp - spec_dists->array, j;
-        for (j = 0; j < array_size(cur_interval_nodes); ++j) {
-            matidx *indices = (matidx *) malloc(sizeof(matidx));
-            indices->i = i, indices->j = j;
-            htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
-#ifndef NDEBUG
-            hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
-            printf("mapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
-#endif
-        }
-
-        // get nodes for the current tau
-        append_newick_node_ptr_array_array(&Y, cur_interval_nodes);
-    }
+    construct_y_matrix(mat_idx_tab, &Y, spec_dists, species_tree, farthest_leaf_dist);
 
 #ifndef NDEBUG
     printf("\n\nY matrix:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (i = 0; i < array_size(Y); ++i) {
         for (j = 0; j < array_size(Y.array[i]); ++j) {
-            printf("Y[%d][%d]: node@%p\n", i, j, Y.array[i].array[j]);
+            printf("Y[%d][%d]: node@%p taxon:%s\n", i, j, Y.array[i].array[j], Y.array[i].array[j]->taxon);
         }
     }
 #endif
