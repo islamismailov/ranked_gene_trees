@@ -1,12 +1,12 @@
 # $ make
 # $ make install (copy into bin directory)
 
-CC = clang
-LINK = clang
+CC = gcc
+LINK = gcc
 INSTALL = install
 
-CFLAGS = -Wall -march=native -mtune=native -I../include -I. # -ggdb for debug, -O3 for release 
-LFLAGS = -march=native -mtune=native
+CFLAGS = -Wall -I../include -I. #-march=native -mtune=native -ggdb for debug, -O3 for release
+LFLAGS = #-march=native -mtune=native
 
 GMPLIB = -L/usr/lib -lgmp 
 
@@ -50,3 +50,4 @@ ensure_dirs:
 
 clean:
 	rm -rf $(OBJ)/*.o $(BIN)/ranked_tree
+

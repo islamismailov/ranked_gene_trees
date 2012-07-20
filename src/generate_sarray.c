@@ -932,7 +932,7 @@ int main(int argc, char **argv) {
     }
     
     // fill values for k[i][m[i]][z]
-    for (i = 1; i < speciation_count - 1; ++i) {
+    for (i = 1; i < speciation_count; ++i) {
         printf("y[%d] has %ld elements\n", i - 1, array_size(Y.array[i - 1]));
         for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
             printf("\ty[%d][%d] has %d children:\n", i - 1, z, Y.array[i-1].array[z]->childNum);
