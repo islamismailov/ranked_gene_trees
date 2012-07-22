@@ -5,6 +5,10 @@ A polynomial-time algorithm has been described for computing probabilities of ra
 
 This project will provide an implementation of polynomial time algorithm to calculate the probability of a ranked gene tree topology for a given species tree.
 
+TODO:
+indexed speciation array should contain distance information to get rid of future get_dist_from_root calls:
+node2int --> node2float
+
 Indexing:
 
 s[] (speciation): same as in paper

@@ -725,10 +725,6 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    //lca_init(coalescence_count, root, coalescence_array);
-    //printf("lca of %d and %d is %d\n", 2, 3, lca (2, 3));
-    //lca_end();
-
 #ifndef NDEBUG
     printf("\n\nIndexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
@@ -745,9 +741,6 @@ int main(int argc, char **argv) {
     }
 }
 #endif
-
-    // this array holds number of coalescence events in interval tau[i]
-    // TODO: add m array
 
 #ifndef NDEBUG
     printf("\n\nLCA preprocessing:\n---- ---- ---- ---- ---- ---- ---- ----\n");
