@@ -41,6 +41,7 @@ DEF_ARRAY_DECL(newick_node_ptr);
 DEF_ARRAY_DECL(newick_node_ptr_array);
 
 DEF_ARRAY_DECL(node2float);
+DEF_ARRAY_DECL(node2float_array);
 DEF_ARRAY_DECL(node2int);
 DEF_ARRAY_DECL(char_ptr);
 DEF_ARRAY_DECL(int_array);

@@ -21,6 +21,8 @@ DEF_ARRAY_IMPL(newick_node_ptr);
 DEF_ARRAY_IMPL(newick_node_ptr_array);
 
 DEF_ARRAY_IMPL(node2float);
+DEF_ARRAY_IMPL(node2float_array);
+
 DEF_ARRAY_IMPL(node2int);
 DEF_ARRAY_IMPL(char_ptr);
 DEF_ARRAY_IMPL(int_array);
@@ -842,8 +844,7 @@ int main(int argc, char **argv) {
     printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     
-    // this is node -> <i,j> mapping for Y array
-    hash_table *mat_idx_tab = htab_get_new();
+    hash_table *mat_idx_tab = htab_get_new(); // node -> <i,j> mapping for Y array
     newick_node_ptr_array_array Y;
     init_newick_node_ptr_array_array(&Y);
     construct_y_matrix(mat_idx_tab, &Y, spec_dists, species_tree, farthest_leaf_dist);
@@ -860,19 +861,29 @@ int main(int argc, char **argv) {
 #ifndef NDEBUG
     printf("\n\nm array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
+    
+    node2float_array_array m;
+    init_node2float_array_array(&m);
 
-    int_array m;
-    init_int_array(&m);
+    //int_array m;
+    //init_int_array(&m);
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
         int coalescence_events_count = 0;
+        node2float_array coalescences;
+        init_node2float_array(&coalescences);
         for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
             // TODO: optimize: no need to call get_distance_from_root all the time
             float dist = farthest_leaf_dist - get_distance_from_root(n2i->node);
             if (dist >= *(fp + 1) && dist < *fp) {
+                node2float coalescence;
+                coalescence.node = n2i->node;
+                coalescence.val = dist;
+                append_node2float_array(&coalescences, coalescence);
                 ++coalescence_events_count;
             }
         }
-        append_int_array(&m, coalescence_events_count);
+        //append_int_array(&m, coalescence_events_count);
+        append_node2float_array_array(&m, coalescences);
         printf("%d coalescence events in interval [%f, %f)\n", coalescence_events_count, *(fp + 1), *fp);
     }
 
@@ -936,14 +947,14 @@ int main(int argc, char **argv) {
         printf("y[%d] has %ld elements\n", i - 1, array_size(Y.array[i - 1]));
         for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
             printf("\ty[%d][%d] has %d children:\n", i - 1, z, Y.array[i-1].array[z]->childNum);
-            K.array[i].array[m.array[i]].array[z] = 0;
+            K.array[i].array[array_size(m.array[i])].array[z] = 0;
             newick_child *p;
             for (p = Y.array[i - 1].array[z]->child; p != NULL; p = p->next) {
                 // we need to fetch i,j indices of p->node
 
                 matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
 
-                printf("\t\tchild@%p of K[%d][m[%d]][%d] (K[%d][%d][%d]) / Y[%d][%d]: ", p->node, i, i, z, i, m.array[i], z, i - 1, z);
+                printf("\t\tchild@%p of K[%d][m[%d]][%d] (K[%d][%ld][%d]) / Y[%d][%d]: ", p->node, i, i, z, i, array_size(m.array[i]), z, i - 1, z);
                 if (indices != NULL) {
                     printf("FOUND ");
                 } else {
@@ -957,12 +968,16 @@ int main(int argc, char **argv) {
         }
     }
     
-    for (i = 1; i < speciation_count - 1; ++i) {
-        for (j = m.array[i] - 1; j >= 0; --j) {
+    for (i = 1; i < speciation_count; ++i) {
+        for (j = array_size(m.array[i]) - 1; j >= 0; --j) {
             for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
-                if (j == 0) {
+                if (j == 0 && i == speciation_count) {
                     K.array[i].array[j].array[z] = 0;
-                } else {
+                }
+                //else if (j-th coalescence in sorted m[i] array is on branch z) {
+                    //K.array[i].array[j].array[z] = K.array[i].array[j+1].array[z] - 1;
+                //}
+                else {
                     K.array[i].array[j].array[z] = K.array[i].array[j+1].array[z];
                 }
             }
