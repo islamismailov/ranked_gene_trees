@@ -177,28 +177,28 @@ int get_tree_coalescence_count(newick_node *t) {
 
 /*
  * coalescence array here is 0-indexed (it's 1-indexed in the original paper)
- * nodes are sorted by distance
+ * nodes are sorted by distance from root
  */
-node2int_array *get_coalescence_array(newick_node *t) {
+node2float_array *get_coalescence_array(newick_node *t) {
     node2float *n2f;
     node2float_array *dist_array = (node2float_array *)malloc(sizeof(node2float_array));
-    node2int_array *coalescence_array = (node2int_array *)malloc(sizeof(node2int_array));
+    node2float_array *coalescence_array = (node2float_array *)malloc(sizeof(node2float_array));
 
     init_node2float_array(dist_array);
-    init_node2int_array(coalescence_array);
+    init_node2float_array(coalescence_array);
 
     do_get_distance_array(t, 0.f, dist_array);
     qsort(dist_array->array, dist_array->last - dist_array->array,
         sizeof(node2float), (int(*)(const void*,const void*))node2float_cmp);
 
-    int c = 0;
+    //int c = 0;
     for (n2f = dist_array->array; n2f != dist_array->last; ++n2f) {
         if (n2f->node->childNum > 0) {
-            node2int pair;
+            node2float pair;
             pair.node = n2f->node;
-            pair.val = c++;
+            pair.val = n2f->val;
 
-            append_node2int_array(coalescence_array, pair);
+            append_node2float_array(coalescence_array, pair);
         }
     }
 
@@ -650,12 +650,12 @@ int main(int argc, char **argv) {
     float_array *spec_dists;
     int_array *gene_lineages;
     int coalescence_count;
-    node2int_array *coalescence_array;
+    node2float_array *coalescence_array;
     node2int_array *species_indexed_nodes;
     int *ip;
     int i, j, k, n;
     float *fp;
-    node2int *n2i;
+    node2float *n2f;
     float farthest_leaf_dist = 0.f;
 
     monitored_memory_init();
@@ -720,8 +720,8 @@ int main(int argc, char **argv) {
 
 #ifndef NDEBUG
     printf("\n\nIndexed Coalescence array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
-    for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-        printf("\tnode@%p with node id %d(%ld array idx) childnum %d taxon %s\n", n2i->node, n2i->val, (n2i - coalescence_array->array), n2i->node->childNum, n2i->node->taxon);
+    for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
+        printf("\tnode@%p with node id %f(%ld array idx) childnum %d taxon %s\n", n2f->node, n2f->val, (n2f - coalescence_array->array), n2f->node->childNum, n2f->node->taxon);
     }
 #endif
 
@@ -738,9 +738,12 @@ int main(int argc, char **argv) {
     species_indexed_nodes = get_indexed_array(species_tree);
 
 #ifndef NDEBUG
+{
+    node2int *n2i;
     for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
         printf("\tnode@%p ith node id %d and array index %ld taxon %s\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array), n2i->node->taxon);
     }
+}
 #endif
 
     // this array holds number of coalescence events in interval tau[i]
@@ -770,13 +773,13 @@ int main(int argc, char **argv) {
             for (k = j; k < n - 1; ++k) {
                 printf("i:%d, j:%d, k:%d\n", i, j, k);
 
-                n2i = (coalescence_array->array + k);
+                n2f = (coalescence_array->array + k);
 
 #ifndef NDEBUG
-                printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2i->node);
+                printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2f->node);
 #endif
 
-                char_ptr_array *taxa = get_all_descedants_taxa(n2i->node);
+                char_ptr_array *taxa = get_all_descedants_taxa(n2f->node);
 
                 clear_int_array(equivalent_node_ids);
 
@@ -871,12 +874,11 @@ int main(int argc, char **argv) {
         int coalescence_events_count = 0;
         node2float_array coalescences;
         init_node2float_array(&coalescences);
-        for (n2i = coalescence_array->array; n2i != coalescence_array->last; ++n2i) {
-            // TODO: optimize: no need to call get_distance_from_root all the time
-            float dist = farthest_leaf_dist - get_distance_from_root(n2i->node);
+        for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
+            float dist = farthest_leaf_dist - n2f->val;
             if (dist >= *(fp + 1) && dist < *fp) {
                 node2float coalescence;
-                coalescence.node = n2i->node;
+                coalescence.node = n2f->node;
                 coalescence.val = dist;
                 append_node2float_array(&coalescences, coalescence);
                 ++coalescence_events_count;
