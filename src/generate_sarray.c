@@ -858,6 +858,7 @@ int main(int argc, char **argv) {
     printf("\n\nm array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     
+    // m[i] arrays contains coalescenses that occur in tau[i] intervals
     node2float_array_array m;
     init_node2float_array_array(&m);
 
@@ -958,27 +959,40 @@ int main(int argc, char **argv) {
                 if (indices == NULL) continue;
                 printf("at y[%d][%d]\n", indices->i, indices->j);
             }
-//            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
-//            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
         }
     }
-    
-    for (i = 1; i < speciation_count; ++i) {
+
+    for (i = 0; i < speciation_count; ++i) {
         for (j = array_size(m.array[i]) - 1; j >= 0; --j) {
-            for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
-                if (j == 0 && i == speciation_count) {
+            for (z = 0; z < array_size(Y.array[i]); ++z) {
+                if (j == 0 && i == speciation_count - 1) {
                     K.array[i].array[j].array[z] = 0;
+                    continue;
                 }
-                //else if (j-th coalescence in sorted m[i] array is on branch z) {
-                    //K.array[i].array[j].array[z] = K.array[i].array[j+1].array[z] - 1;
-                //}
-                else {
-                    K.array[i].array[j].array[z] = K.array[i].array[j+1].array[z];
-                }
+                // get # of lineages
+                float dist = m.array[i].array[j].val + 1e-6;
+                int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[j]);
+                K.array[i].array[j].array[z] = get_gene_lineages_for_k(&dist, gene_tree, farthest_leaf_dist, &topology_prefix);
+
             }
         }
     }
 
+#ifndef NDEBUG
+
+    printf("\n\nk array (results):\n---- ---- ---- ---- ---- ---- ---- ----\n");
+
+    for (i = 0; i < speciation_count; ++i) {
+        for (j = array_size(m.array[i]) - 1; j >= 0; --j) {
+            for (z = 0; z < array_size(Y.array[i]); ++z) {
+                printf("\tK[%d][%d][%d] = %d\n", i, j, z, K.array[i].array[j].array[z]);
+            }
+        }
+    }
+#endif
+    
     lca_end();
     monitored_memory_end();
     return 0;
