@@ -28,19 +28,28 @@ void lca_preprocess(node2int_array *coalescence_array, int v, int p) {
     // iterate through children of coalescence u[v]:
     
     for (np = coalescence_array->array[v].node->child; np != NULL; np = np->next) {
+#ifndef NDEBUG
         printf("\titerating thru children of u[%d]@%p:\n", v, coalescence_array->array[v].node);
+#endif
         // find child's index (to)
         for (cp = coalescence_array->array, to = 0; cp != coalescence_array->last; ++to, ++cp) {
             //if (cp->node == coalescence_array->array[v].node)
             if (cp->node == np->node)
                 break;
         }
-        
-        printf("\tu[%d](u[%d])@%p is a child? ", to, cp->val, np->node);
+#ifndef NDEBUG
+        printf("\t\tu[%d](u[%d])@%p is a child? ", to, cp->val, np->node);
+#endif
         if (to != p && to != coalescence_array->last - coalescence_array->array) {
+#ifndef NDEBUG
             puts("y");
+#endif
             lca_preprocess(coalescence_array, cp->val, v);
-        } else puts("n");
+        } else {
+#ifndef NDEBUG
+            puts("n");
+#endif
+        }
     }
     
     tout[v] = ++timer;
