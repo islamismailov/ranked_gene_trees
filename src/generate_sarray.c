@@ -88,7 +88,8 @@ float theorem3_func(int i, int l_i, int n, int_array_array *lambda, float_array 
 
 float theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambda, float_array *spec_dists, node2float_array_array *m) {
     
-    if (i == n - 2 && l_i == n - 1) return 1;
+    if (i == n - 2 && l_i == n - 1) { puts("base"); return 1;}
+    printf("i:%d l_i:%d, n:%d\n", i, l_i, n);
     
     float res = 0;
     int l_i_plus_1;
@@ -123,6 +124,7 @@ int do_get_gene_lineages(newick_node *t, float limit, float distance, float max_
     newick_child *p;
     printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
     if ((max_dist_from_root - distance - t->dist) <= limit) {
+//    if (limit - (max_dist_from_root - distance - t->dist) >= -1e-6) {
         puts("y");
         return lineages + 1;
     } else puts("n");
@@ -140,7 +142,11 @@ int_array *get_gene_lineages(float_array *speciation_distances, newick_node *t, 
 
     init_int_array(lineages);
     for (p = speciation_distances->array; p != speciation_distances->last; ++p) {
-        append_int_array(lineages, do_get_gene_lineages(t, *p, 0.f, max_dist_from_root));
+        if (max_dist_from_root < *p) {
+            append_int_array(lineages, 0);
+        } else {
+            append_int_array(lineages, do_get_gene_lineages(t, *p, 0.f, max_dist_from_root));
+        }
     }
     return lineages;
 }
@@ -726,7 +732,9 @@ int main(int argc, char **argv) {
     printTree(species_tree);
 #endif
 
+    //max_dist_from_species_root
     farthest_leaf_dist = max_dist_from_root(species_tree);
+    float max_dist_from_gene_root = max_dist_from_root(gene_tree);
 
 #ifndef NDEBUG
     printf("\n\nMax distance from root for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -744,10 +752,10 @@ int main(int argc, char **argv) {
 #endif
 
 #ifndef NDEBUG
-    printf("\n\nGene Lineages:\n");
+    printf("\n\nGene Lineages:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
 
-    gene_lineages = get_gene_lineages(spec_dists, gene_tree, farthest_leaf_dist);
+    gene_lineages = get_gene_lineages(spec_dists, gene_tree, max_dist_from_gene_root);
 
 #ifndef NDEBUG
     for (ip = gene_lineages->array; ip != gene_lineages->last; ++ip) {
@@ -1064,6 +1072,8 @@ int main(int argc, char **argv) {
         }
     }
 #endif
+    
+    printf("\n\nfinal steps:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     
     int l_1;
     n = speciation_count;
