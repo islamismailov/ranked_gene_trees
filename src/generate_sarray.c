@@ -806,8 +806,13 @@ int main(int argc, char **argv) {
 
     int_array g;
     init_int_array(&g);
+    
+    int species_leaves_count = get_leaves_count(species_tree);
+    int gene_leaves_count = get_leaves_count(gene_tree);
+    
+    assert(species_leaves_count == gene_leaves_count);
 
-    n = get_leaves_count(species_tree); // should be same for gene_tree
+    n = species_leaves_count;
     for (i = 0; i < n; ++i) {
         int min_lineages = 0;
 
@@ -886,7 +891,6 @@ int main(int argc, char **argv) {
     printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     bead_tree(species_tree, spec_dists, farthest_leaf_dist);
-    
     
 #ifndef NDEBUG
     printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
