@@ -9,7 +9,7 @@ typedef struct newick_child {
 typedef struct newick_node {
     int id;
 	char *taxon;
-	float dist;
+	double dist;
 	int childNum;
 	struct newick_child *child;
 	struct newick_node *parent;
@@ -17,7 +17,7 @@ typedef struct newick_node {
 
 typedef struct newick_bin_node {
     int id;
-    float dist;
+    double dist;
     char *taxon;
 
     struct newick_bin_node *parent;
