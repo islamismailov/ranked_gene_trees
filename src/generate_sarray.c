@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <gmp.h>
+#include <mpfr.h>
 
 #include "newick_tree.h"
 
@@ -14,20 +16,9 @@
 #include "monitored_memory.h"
 #include "generate_sarray.h"
 
-DEF_ARRAY_IMPL(int);
-DEF_ARRAY_IMPL(char);
-DEF_ARRAY_IMPL(float);
+#define MPF_PRECISION 1024
 
-DEF_ARRAY_IMPL(newick_node_ptr);
-DEF_ARRAY_IMPL(newick_node_ptr_array);
-
-DEF_ARRAY_IMPL(node2float);
-DEF_ARRAY_IMPL(node2float_array);
-
-DEF_ARRAY_IMPL(node2int);
-DEF_ARRAY_IMPL(char_ptr);
-DEF_ARRAY_IMPL(int_array);
-DEF_ARRAY_IMPL(int_array_array);
+// use mpf_t (mpfr_t) instead of float
 
 float max(float x, float y) {
     return x > y? x : y;
@@ -361,11 +352,11 @@ void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, float sta
     //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
     float root_dist = get_distance_from_root(n);
     float dist = max_root_distance - root_dist;
-    //printf("\tnode@%p with dist %f (maxrootdist %f - rootdist %f", n, dist, max_root_distance, root_dist);
+    printf("\t\tnode@%p with taxon %s: %f <= %f < %f", n, n->taxon, start_interval, dist, end_interval);
     if (dist >= start_interval && dist < end_interval) {
-    //    printf(" INSIDE\n");
+        printf(" y\n");
         append_newick_node_ptr_array(arr, n);
-    }// else printf(" OUTSIDE\n");
+    } else printf(" n\n");
 
     newick_child *p;
     for (p = n->child; p != NULL; p = p->next) {
@@ -891,6 +882,7 @@ int main(int argc, char **argv) {
     printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     bead_tree(species_tree, spec_dists, farthest_leaf_dist);
+    printTree(species_tree);
     
 #ifndef NDEBUG
     printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
