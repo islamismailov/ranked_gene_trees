@@ -502,7 +502,7 @@ node2int_array *get_indexed_array(newick_node *t) {
     return nodes_array;
 }
 
-void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y, real_array *spec_dists, newick_node *species_tree, real_t farthest_leaf_dist) {
+void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y, real_array *spec_dists, newick_node *species_tree, real_t max_dist_from_species_root) {
     int i, j;
     real_t *fp;
     
@@ -516,7 +516,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
 #ifndef NDEBUG
         printf("\tNodes in interval [%f, %f)\n", *(fp + 1), *fp);
 #endif
-        add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, farthest_leaf_dist);
+        add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, max_dist_from_species_root);
         
         //index each node in a hashtable
         int i = fp - spec_dists->array, j;
@@ -544,7 +544,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
 #ifndef NDEBUG
     printf("\tNodes in interval [%f, %f)\n", 0.f, *fp);
 #endif
-    add_nodes_in_interval(&cur_interval_nodes, species_tree, 0.f, *fp, farthest_leaf_dist);
+    add_nodes_in_interval(&cur_interval_nodes, species_tree, 0.f, *fp, max_dist_from_species_root);
     
     //index each node in a hashtable
     i = fp - spec_dists->array;
@@ -731,7 +731,6 @@ int main(int argc, char **argv) {
     int i, j, k, n;
     real_t *fp;
     node2real *n2f;
-    real_t farthest_leaf_dist = 0.f;
 
     monitored_memory_init();
 
@@ -760,16 +759,16 @@ int main(int argc, char **argv) {
 #endif
 
     //max_dist_from_species_root
-    farthest_leaf_dist = max_dist_from_root(species_tree);
+    real_t max_dist_from_species_root = max_dist_from_root(species_tree);
     real_t max_dist_from_gene_root = max_dist_from_root(gene_tree);
 
 #ifndef NDEBUG
     printf("\n\nMax distance from root for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
-    printf("\t%f\n", farthest_leaf_dist);
+    printf("\t%f\n", max_dist_from_species_root);
 #endif
 
-    // find speciation distances (0 is farthest leaf from the root)
-    spec_dists = get_speciation_distances(species_tree, farthest_leaf_dist);
+    // find speciation distances (0 is max distance from species root)
+    spec_dists = get_speciation_distances(species_tree, max_dist_from_species_root);
 
 #ifndef NDEBUG
     printf("\n\nSpeciation distances:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -886,8 +885,8 @@ int main(int argc, char **argv) {
                 }
 
                 // let's find tau interval for a given lowest common ancestor
-                // and to do that we need to calculate it's distance from the farthest leaf from the root
-                real_t lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
+                // and to do that we need to calculate it's distance from the max distance from species root
+                real_t lca_dist = max_dist_from_species_root - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
                 for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
 //                    if (lca_dist >= *(fp + 1) && lca_dist < *fp) {
                     if (real_cmp(lca_dist, *(fp + 1)) >= 0 && real_cmp(lca_dist, *fp) < 0) {
@@ -918,7 +917,7 @@ int main(int argc, char **argv) {
 #ifndef NDEBUG
     printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
-    bead_tree(species_tree, spec_dists, farthest_leaf_dist);
+    bead_tree(species_tree, spec_dists, max_dist_from_species_root);
     printTree(species_tree);
     
 #ifndef NDEBUG
@@ -928,7 +927,7 @@ int main(int argc, char **argv) {
     hash_table *mat_idx_tab = htab_get_new(); // node -> <i,j> mapping for Y array
     newick_node_ptr_array_array Y;
     init_newick_node_ptr_array_array(&Y);
-    construct_y_matrix(mat_idx_tab, &Y, spec_dists, species_tree, farthest_leaf_dist);
+    construct_y_matrix(mat_idx_tab, &Y, spec_dists, species_tree, max_dist_from_species_root);
 
 #ifndef NDEBUG
     printf("\n\nY matrix:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -976,19 +975,6 @@ int main(int argc, char **argv) {
     printf("\n\nk array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
 
-/*
-    // let's allocate k[][][] array
-    int k_z_dim = 5, k_i_dim = 5, k_j_dim = 5;
-    int ***k_arr;
-    k_arr = (int ***) malloc(sizeof(int**)*k_i_dim);
-    for (i = k_i_dim; i < k_i_dim; ++i) {
-        *(k_arr + i) = (int**)malloc(sizeof(int*)*k_j_dim);
-        for (j = 0; j < k_j_dim; ++j) {
-            *(*(k_arr + i) + j) = (int *)malloc(sizeof(int)*k_z_dim);
-        }
-    }
-*/
-
     // k[][][] array
     int speciation_count = spec_dists->last - spec_dists->array; // this is i dimension
     coalescence_count = get_tree_coalescence_count(gene_tree);   // this is j dimension
@@ -1022,7 +1008,7 @@ int main(int argc, char **argv) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
             printf("run for spec_dists[%d]=%f\n", i-1, (spec_dists->array)[i - 1]);
-            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, max_dist_from_species_root);
         }
     }
     
@@ -1048,7 +1034,7 @@ int main(int argc, char **argv) {
                 printf("at y[%d][%d]\n", indices->i, indices->j);
             }
             int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
-            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, farthest_leaf_dist);
+            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, max_dist_from_species_root);
         }
     }
 
@@ -1060,10 +1046,10 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 // get # of lineages
-                real_t dist = (farthest_leaf_dist - m.array[i].array[j].val) - 1e-6;
+                real_t dist = (max_dist_from_species_root - m.array[i].array[j].val) - 1e-6;
                 printf("dist %.6f\n", dist);
                 int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[j]);
-                K.array[i].array[j].array[z] = get_gene_lineages_for_k(&dist, gene_tree, farthest_leaf_dist, &topology_prefix);
+                K.array[i].array[j].array[z] = get_gene_lineages_for_k(&dist, gene_tree, max_dist_from_species_root, &topology_prefix);
 
             }
         }
