@@ -954,8 +954,8 @@ int main(int argc, char **argv) {
         node2real_array coalescences;
         init_node2real_array(&coalescences);
         for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
-            real_t dist = farthest_leaf_dist - n2f->val;
-            printf("\t%f >= %f && %f < %f?", dist, *(fp + 1), dist, *fp);
+            real_t dist = max_dist_from_gene_root - n2f->val;
+            printf("\t%f =< %f < %f?", *(fp + 1), dist, *fp);
 //            if (dist >= *(fp + 1) && dist < *fp) {
             if (real_cmp(dist, *(fp + 1)) >= 0 && real_cmp(dist, *fp) < 0) {
                 printf(" y\n");
