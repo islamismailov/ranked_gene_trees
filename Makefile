@@ -5,10 +5,10 @@ CC = gcc
 LINK = gcc
 INSTALL = install
 
-CFLAGS = -Wall -I../include -I. #-march=native -mtune=native -ggdb for debug, -O3 for release
-LFLAGS = #-march=native -mtune=native
+GMPLIB = -L/usr/local/lib -lgmp -lmpfr
 
-GMPLIB = -L/usr/lib -lgmp 
+CFLAGS = -Wall -I../include -I. #-march=native -mtune=native -ggdb for debug, -O3 for release
+LFLAGS = $(GMPLIB) #-march=native -mtune=native
 
 BIN = bin
 OBJ = obj
@@ -25,7 +25,7 @@ $(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
 $(OBJ)/hash_table.o: $(SRC)/hash_table.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
-$(OBJ)/utils.o: $(SRC)/utils.c
+$(OBJ)/traits.o: $(SRC)/traits.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 $(OBJ)/monitored_memory.o: $(SRC)/monitored_memory.c
@@ -41,7 +41,7 @@ $(OBJ)/lca.o: $(SRC)/lca.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 # Build binaries
-$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/utils.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o $(OBJ)/lca.o
+$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/traits.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o $(OBJ)/lca.o
 	$(LINK) $(LFLAGS) -o $@ $^
 
 ensure_dirs:
