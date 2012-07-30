@@ -21,8 +21,6 @@ int init_##NAME(NAME *); \
 int append_##NAME(NAME *, ITEM_TYPE); \
 void clear_##NAME(NAME *); \
 
-
-
 #define DEF_ARRAY_IMPL(ITEM_TYPE, NAME) \
 int init_##NAME(NAME *a) { \
     size_t size = 16; \

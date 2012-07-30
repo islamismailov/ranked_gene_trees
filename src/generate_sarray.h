@@ -9,7 +9,7 @@
 #ifndef ranked_gene_tree_generate_sarray_h
 #define ranked_gene_tree_generate_sarray_h
 
-#include "utils.h"
+#include "traits.h"
 #include "newick_tree.h"
 #include <stdlib.h>
 #include <mpfr.h>

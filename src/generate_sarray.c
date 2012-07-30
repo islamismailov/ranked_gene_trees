@@ -10,23 +10,21 @@
 #include "newick_tree.h"
 
 #include "lca.h"
-#include "utils.h"
+#include "traits.h"
 #include "getopt.h"
 #include "hash_table.h"
 #include "monitored_memory.h"
 #include "generate_sarray.h"
 
-#define MPF_PRECISION 1024
-
-double get_distance_from_root(newick_node *n) {
-    double dist = n->dist;
+real_t get_distance_from_root(newick_node *n) {
+    real_t dist = n->dist;
     if (n->parent != NULL) dist += get_distance_from_root(n->parent);
     return dist;
 }
 
 mpfr_ptr get_distance_from_root_mpfr(newick_node *n) {
     mpfr_ptr dist = (mpfr_ptr) malloc(sizeof(mpfr_t));
-    mpfr_init2(dist, MPF_PRECISION);
+    mpfr_init2(dist, MPFR_PRECISION);
     mpfr_set_zero(dist, 0);
     
     mpfr_set_d(dist, n->dist, MPFR_RNDN);
@@ -39,9 +37,9 @@ mpfr_ptr get_distance_from_root_mpfr(newick_node *n) {
     return dist;
 }
 
-double max_dist_from_root(newick_node *t) {
+real_t max_dist_from_root(newick_node *t) {
     newick_child *p;
-    double dist = 0.f;
+    real_t dist = 0.f;
     for (p = t->child; p != NULL; p = p->next) {
         dist = fmax(dist, max_dist_from_root(p->node));
     }
@@ -51,7 +49,7 @@ double max_dist_from_root(newick_node *t) {
 mpfr_ptr max_dist_from_root_mpfr(newick_node *n) {
     newick_child *p;
     mpfr_ptr dist = (mpfr_ptr) malloc(sizeof(mpfr_t));
-    mpfr_init2(dist, MPF_PRECISION);
+    mpfr_init2(dist, MPFR_PRECISION);
     mpfr_set_zero(dist, 0);
     
     for (p = n->child; p != NULL; p = p->next) {
@@ -69,21 +67,21 @@ int combinations(int n, int k) {
     else return combinations(n - 1, k - 1) + combinations(n - 1, k);
 }
 
-double H(int l_1) {
+real_t H(int l_1) {
     int x;
-    double res = 1.;
+    real_t res = 1.;
     for (x = 1; x < l_1; ++x) {
         res *= x * x * 0.5;
     }
     return res * l_1;
 }
 
-double theorem3_func(int i, int l_i, int n, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
+real_t theorem3_func(int i, int l_i, int n, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
     int j, k;
-    double P = 0;
+    real_t P = 0;
     for (j = 0; j < array_size(m->array[i]); ++j) {
-        double nom = expf(-lambda->array[i].array[j] * (spec_dists->array[i - 1] - spec_dists->array[i]));
-        double denom = 1.0;
+        real_t nom = expf(-lambda->array[i].array[j] * (spec_dists->array[i - 1] - spec_dists->array[i]));
+        real_t denom = 1.0;
         for (k = 0; k < array_size(m->array[i]); ++k) {
             if (k == j) continue;
             denom *= (lambda->array[i].array[k] - lambda->array[i].array[j]);
@@ -99,7 +97,7 @@ mpfr_ptr theorem3_func_mpfr(int i, int l_i, int n, int_array_array *lambda, mpfr
     P = (mpfr_ptr) malloc(sizeof(mpfr_t));
     nom = (mpfr_ptr) malloc(sizeof(mpfr_t));
     denom = (mpfr_ptr) malloc(sizeof(mpfr_t));
-    mpfr_inits2(MPF_PRECISION, P, nom, denom, (mpfr_ptr) 0);
+    mpfr_inits2(MPFR_PRECISION, P, nom, denom, (mpfr_ptr) 0);
     
     mpfr_set_zero(P, 0);
     for (j = 0; j < array_size(m->array[i]); ++j) {
@@ -121,12 +119,12 @@ mpfr_ptr theorem3_func_mpfr(int i, int l_i, int n, int_array_array *lambda, mpfr
     return P;
 }
 
-double theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
+real_t theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
     
     if (i == n - 2 && l_i == n - 1) { puts("base"); return 1;}
     printf("i:%d l_i:%d, n:%d\n", i, l_i, n);
     
-    double res = 0;
+    real_t res = 0;
     int l_i_plus_1;
     for (l_i_plus_1 = fmax(l_i, g->array[i + 1]); l_i_plus_1 < n; ++l_i_plus_1) {
         res += theorem3_func(i + 1, l_i_plus_1, n, lambda, spec_dists, m) * theorem2_func(i + 1, l_i_plus_1, n, g, lambda, spec_dists, m);
@@ -139,7 +137,7 @@ mpfr_ptr theorem2_func_mpfr(int i, int l_i, int n, int_array *g, int_array_array
     return x;
 }
 
-void do_get_speciation_distances(newick_node *t, double distance, real_array *speciation_distances, double max_dist_from_root) {
+void do_get_speciation_distances(newick_node *t, real_t distance, real_array *speciation_distances, real_t max_dist_from_root) {
     newick_child *p;
     if (t->childNum > 0) // speciation happened
         append_real_array(speciation_distances, max_dist_from_root - (distance + t->dist));
@@ -148,18 +146,18 @@ void do_get_speciation_distances(newick_node *t, double distance, real_array *sp
     }
 }
 
-real_array *get_speciation_distances(newick_node *t, double max_dist_from_root) {
+real_array *get_speciation_distances(newick_node *t, real_t max_dist_from_root) {
     real_array *speciation_distances = (real_array *)malloc(sizeof(real_array));
     init_real_array(speciation_distances);
     do_get_speciation_distances(t, 0.0f, speciation_distances, max_dist_from_root);
     append_real_array(speciation_distances, FLT_MAX);
 
     qsort(speciation_distances->array, speciation_distances->last - speciation_distances->array,
-        sizeof(double), (int(*)(const void*,const void*))flt_cmp_desc);
+        sizeof(real_t), (int(*)(const void*,const void*))flt_cmp_desc);
     return speciation_distances;
 }
 
-int do_get_gene_lineages(newick_node *t, double limit, double distance, double max_dist_from_root) {
+int do_get_gene_lineages(newick_node *t, real_t limit, real_t distance, real_t max_dist_from_root) {
     int lineages = 0;
     newick_child *p;
     printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
@@ -176,8 +174,8 @@ int do_get_gene_lineages(newick_node *t, double limit, double distance, double m
     return lineages;
 }
 
-int_array *get_gene_lineages(real_array *speciation_distances, newick_node *t, double max_dist_from_root) {
-    double *p;
+int_array *get_gene_lineages(real_array *speciation_distances, newick_node *t, real_t max_dist_from_root) {
+    real_t *p;
     int_array *lineages = (int_array *)malloc(sizeof(int_array));
 
     init_int_array(lineages);
@@ -192,7 +190,7 @@ int_array *get_gene_lineages(real_array *speciation_distances, newick_node *t, d
     return lineages;
 }
 
-int do_get_gene_lineages_for_k(newick_node *t, double limit, double distance, double max_dist_from_root, int_array *species_turns, int_array *gene_turns, int turn) {
+int do_get_gene_lineages_for_k(newick_node *t, real_t limit, real_t distance, real_t max_dist_from_root, int_array *species_turns, int_array *gene_turns, int turn) {
     int lineages = 0;
     newick_child *p;
     int *gp, *sp;
@@ -229,7 +227,7 @@ int do_get_gene_lineages_for_k(newick_node *t, double limit, double distance, do
     return lineages;
 }
 
-int get_gene_lineages_for_k(double *speciation_distance, newick_node *t, double max_dist_from_root, int_array *species_turns) {
+int get_gene_lineages_for_k(real_t *speciation_distance, newick_node *t, real_t max_dist_from_root, int_array *species_turns) {
     int lineages = 0;
     int_array *gene_turns = (int_array *) malloc(sizeof(int_array));
     init_int_array(gene_turns);
@@ -240,7 +238,7 @@ int get_gene_lineages_for_k(double *speciation_distance, newick_node *t, double 
 /*
  * distances from the root for each node
  */
-void do_get_distance_array(newick_node *t, double distance, node2real_array *dist_array) {
+void do_get_distance_array(newick_node *t, real_t distance, node2real_array *dist_array) {
     newick_child *p;
     node2real pair;
     pair.val = distance + t->dist;
@@ -317,7 +315,7 @@ int_array get_topology_prefix(newick_node *n, newick_node *target) {
     return topology_prefix;
 }
 
-int do_get_exit_branches(newick_node *n, double limit, double distance, int_array *topology_prefix, int_array *self_topology_prefix, double max_dist_from_root) {
+int do_get_exit_branches(newick_node *n, real_t limit, real_t distance, int_array *topology_prefix, int_array *self_topology_prefix, real_t max_dist_from_root) {
     int exit_branches_count = 0;
     newick_child *p;
 
@@ -375,7 +373,7 @@ int do_get_exit_branches(newick_node *n, double limit, double distance, int_arra
     return exit_branches_count;
 }
 
-int get_exit_branches(newick_node *n, double distance, int_array *topology_prefix, double max_dist_from_root) {
+int get_exit_branches(newick_node *n, real_t distance, int_array *topology_prefix, real_t max_dist_from_root) {
     int_array self_topology_prefix;
     init_int_array(&self_topology_prefix);
     int exit_branches_count = do_get_exit_branches(n, distance, 0.f, topology_prefix, &self_topology_prefix, max_dist_from_root);
@@ -383,10 +381,10 @@ int get_exit_branches(newick_node *n, double distance, int_array *topology_prefi
     return exit_branches_count;
 }
 
-void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, double start_interval, double end_interval, double max_root_distance) {
+void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, real_t start_interval, real_t end_interval, real_t max_root_distance) {
     //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
-    double root_dist = get_distance_from_root(n);
-    double dist = max_root_distance - root_dist;
+    real_t root_dist = get_distance_from_root(n);
+    real_t dist = max_root_distance - root_dist;
     printf("\t\tnode@%p with taxon %s: %f <= %f < %f", n, n->taxon, start_interval, dist, end_interval);
 //    if (dist >= start_interval && dist < end_interval) {
     if (real_cmp(dist, start_interval) >= 0 && real_cmp(dist, end_interval) < 0) {
@@ -400,21 +398,21 @@ void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, double st
     }
 }
 
-void do_bead_tree(newick_node *t, double distance, real_array *speciation_distances, double max_dist_from_root) {
-    double *fp;
+void do_bead_tree(newick_node *t, real_t distance, real_array *speciation_distances, real_t max_dist_from_root) {
+    real_t *fp;
 
     newick_node *bead;
     newick_child *p, *q, *child, *child_head, *new_child;
     
     // if a node is a leaf, we need to extend it so it's distance from root = max_dist_from_root
-    double root_dist = distance + t->dist;
+    real_t root_dist = distance + t->dist;
     assert(real_cmp(root_dist, 0.0) >= 0);
 //    if (t->childNum == 0 && root_dist < max_dist_from_root) {
     if (t->childNum == 0 && real_cmp(root_dist, max_dist_from_root) < 0) {
         t->dist += max_dist_from_root - root_dist;
     }
 
-    double start_interval, end_interval;
+    real_t start_interval, end_interval;
 
     end_interval = max_dist_from_root - (distance + t->dist);
     for (p = t->child; p != NULL; ) {
@@ -471,7 +469,7 @@ void do_bead_tree(newick_node *t, double distance, real_array *speciation_distan
     }
 }
 
-void bead_tree(newick_node *n, real_array *speciation_times, double max_dist_from_root) {
+void bead_tree(newick_node *n, real_array *speciation_times, real_t max_dist_from_root) {
     do_bead_tree(n, 0.f, speciation_times, max_dist_from_root);
 }
 
@@ -504,9 +502,9 @@ node2int_array *get_indexed_array(newick_node *t) {
     return nodes_array;
 }
 
-void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y, real_array *spec_dists, newick_node *species_tree, double farthest_leaf_dist) {
+void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y, real_array *spec_dists, newick_node *species_tree, real_t farthest_leaf_dist) {
     int i, j;
-    double *fp;
+    real_t *fp;
     
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
         //int_array cur_interval_nodes;
@@ -731,9 +729,9 @@ int main(int argc, char **argv) {
     node2int_array *species_indexed_nodes;
     int *ip;
     int i, j, k, n;
-    double *fp;
+    real_t *fp;
     node2real *n2f;
-    double farthest_leaf_dist = 0.f;
+    real_t farthest_leaf_dist = 0.f;
 
     monitored_memory_init();
 
@@ -763,7 +761,7 @@ int main(int argc, char **argv) {
 
     //max_dist_from_species_root
     farthest_leaf_dist = max_dist_from_root(species_tree);
-    double max_dist_from_gene_root = max_dist_from_root(gene_tree);
+    real_t max_dist_from_gene_root = max_dist_from_root(gene_tree);
 
 #ifndef NDEBUG
     printf("\n\nMax distance from root for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
@@ -846,7 +844,7 @@ int main(int argc, char **argv) {
         int min_lineages = 0;
 
         for (j = i + 1; j < n - 1; ++j) {
-            double product = 1.0;
+            real_t product = 1.0;
             for (k = j; k < n - 1; ++k) {
                 //printf("i:%d, j:%d, k:%d\n", i, j, k);
 
@@ -889,7 +887,7 @@ int main(int argc, char **argv) {
 
                 // let's find tau interval for a given lowest common ancestor
                 // and to do that we need to calculate it's distance from the farthest leaf from the root
-                double lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
+                real_t lca_dist = farthest_leaf_dist - get_distance_from_root((species_indexed_nodes->array + lca_idx)->node);
                 for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
 //                    if (lca_dist >= *(fp + 1) && lca_dist < *fp) {
                     if (real_cmp(lca_dist, *(fp + 1)) >= 0 && real_cmp(lca_dist, *fp) < 0) {
@@ -956,7 +954,7 @@ int main(int argc, char **argv) {
         node2real_array coalescences;
         init_node2real_array(&coalescences);
         for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
-            double dist = farthest_leaf_dist - n2f->val;
+            real_t dist = farthest_leaf_dist - n2f->val;
             printf("\t%f >= %f && %f < %f?", dist, *(fp + 1), dist, *fp);
 //            if (dist >= *(fp + 1) && dist < *fp) {
             if (real_cmp(dist, *(fp + 1)) >= 0 && real_cmp(dist, *fp) < 0) {
@@ -1062,7 +1060,7 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 // get # of lineages
-                double dist = (farthest_leaf_dist - m.array[i].array[j].val) - 1e-6;
+                real_t dist = (farthest_leaf_dist - m.array[i].array[j].val) - 1e-6;
                 printf("dist %.6f\n", dist);
                 int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[j]);
                 K.array[i].array[j].array[z] = get_gene_lineages_for_k(&dist, gene_tree, farthest_leaf_dist, &topology_prefix);
@@ -1113,7 +1111,7 @@ int main(int argc, char **argv) {
     
     int l_1;
     n = speciation_count;
-    double P = 0;
+    real_t P = 0;
     for (l_1 = g.array[0]; l_1 < speciation_count; ++l_1) {
         P += theorem2_func(0, l_1, n, &g, &lambda, spec_dists, &m) / H(l_1);
     }
