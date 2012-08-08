@@ -19,7 +19,7 @@ SRC = src
 all: ensure_dirs $(BIN)/ranked_tree
 
 # Generate object files
-$(OBJ)/generate_sarray.o: $(SRC)/generate_sarray.c
+$(OBJ)/main.o: $(SRC)/main.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 $(OBJ)/hash_table.o: $(SRC)/hash_table.c
@@ -41,7 +41,7 @@ $(OBJ)/lca.o: $(SRC)/lca.c
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 # Build binaries
-$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/generate_sarray.o $(OBJ)/traits.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o $(OBJ)/lca.o
+$(BIN)/ranked_tree: $(OBJ)/newick_tree.o $(OBJ)/main.o $(OBJ)/traits.o $(OBJ)/getopt.o $(OBJ)/monitored_memory.o $(OBJ)/hash_table.o $(OBJ)/lca.o
 	$(LINK) $(LFLAGS) -o $@ $^
 
 ensure_dirs:

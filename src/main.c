@@ -14,7 +14,6 @@
 #include "getopt.h"
 #include "hash_table.h"
 #include "monitored_memory.h"
-#include "generate_sarray.h"
 
 real_t get_distance_from_root(newick_node *n) {
     real_t dist = n->dist;
@@ -718,6 +717,352 @@ int check_tree_parent_references(newick_node *n) {
     return status;
 }
 
+int check_leaves_not_null(newick_node *n) {
+    int ok = 1;
+    newick_child *p;
+    
+    for (p = n->child; p != NULL; p=p->next) {
+        if (p->node->child == NULL) {
+            ok &= (p->node->taxon != NULL);
+        } else {
+            ok &= check_leaves_not_null(p->node);
+        }
+        if (!ok) break;
+    }
+    return ok;
+}
+
+void get_dfs_leaf_order(newick_node *n, char_ptr_array *out) {
+    newick_child *p;
+
+    for (p = n->child; p != NULL; p = p->next) get_dfs_leaf_order(p->node, out);
+    
+    if (n->child == NULL) append_char_ptr_array(out, n->taxon);
+}
+
+int check_leaf_equivalence(char_ptr_array *species_tree_leaves, char_ptr_array *gene_tree_leaves) {
+    char_ptr *p, *q;
+    
+    if (array_size(*species_tree_leaves) != array_size(*gene_tree_leaves)) return 0;
+    
+    for (p = species_tree_leaves->array; p != species_tree_leaves->last; ++p) {
+        int found = 0;
+        for (q = gene_tree_leaves->array; q != gene_tree_leaves->last; ++q) {
+            if (strcmp(*p, *q) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) return 0;
+    }
+    return 1;
+}
+
+int check_leaves_unique(char_ptr_array *leaves) {
+    char_ptr *p, *q;
+    for (p = leaves->array; p != leaves->last; ++p) {
+        int unique = 1;
+        for (q = p + 1; q != leaves->last; ++q) {
+            if (strcmp(*p, *q) == 0) {
+                unique = 0;
+                break;
+            }
+        }
+        if (!unique) return 0;
+    }
+    return 1;
+}
+
+int same_leaf_order(char_ptr_array *species_leaf_order, char_ptr_array *gene_leaf_order) {
+    char_ptr *p, *q;
+    if (array_size(*species_leaf_order) != array_size(*gene_leaf_order)) return 0;
+    for (p = species_leaf_order->array, q = gene_leaf_order->array; p != species_leaf_order->last && q != gene_leaf_order->last; ++p, ++q) {
+        if (strcmp(*p, *q) != 0) return 0;
+    }
+    return 1;
+}
+
+void taxon_swap_front(newick_node *n, char_ptr *taxon) {
+    newick_child *p, *p_prev;
+    for (p = n->child; p != NULL; p_prev = p, p = p->next) {
+        if (p->node->taxon) {
+            if (p == n->child) return;
+            
+            p_prev->next = p->next;
+            p->next = n->child;
+            n->child = p;
+            break;
+        }
+    }
+}
+
+
+
+
+/*
+ int force_leaf_order(newick_node *n, char_ptr_array *species_leaf_order, char_ptr_array *gene_leaf_order, char_ptr_array *current_order) {
+ 
+ if (n->child == NULL) {
+ append_char_ptr_array(current_order, n->taxon);
+ return 1;
+ }
+ 
+ newick_child *p;
+ 
+ char_ptr_array suborder;
+ init_char_ptr_array(&suborder);
+ 
+ for (p = n->child; p != NULL; p = p->next) {
+ force_leaf_order(p->node, species_leaf_order, gene_leaf_order, &suborder);
+ }
+ 
+ // we have stuff in order, now we need to actually put it in order by rearranging leaves
+ 
+ // get correct order for the taxa we've got
+ 
+ int started = 0;
+ char_ptr *i, *j;
+ char_ptr_array correct_suborder;
+ init_char_ptr_array(&correct_suborder);
+ for (i = species_leaf_order->array; i != species_leaf_order->last; ++i) {
+ int found = 0;
+ for (j = suborder.array; j != suborder.last; ++j) {
+ if (strcmp(*i, *j) == 0) {
+ if (!started) started = 1;
+ found = 1;
+ break;
+ }
+ 
+ if (found) {
+ append_char_ptr_array(&correct_suborder, *j);
+ } else {
+ if (started) {
+ // we've got a leaf from different branch inside correct order,
+ // which means that we cannot force this tree to that order, so
+ // cleanup and return fail
+ return 0;
+ }
+ }
+ }
+ }
+ 
+ for (i = correct_suborder.array, j = suborder.array; j != correct_suborder.last && j != suborder.last; ++i, ++j) {
+ if (strcmp(*i, *j) != 0) {
+ // we need to find (*i) in suborder and put it in (j - suborder)-th position
+ int position = j - suborder.array;
+ int current_position = 0;
+ for (p = n->child; p != NULL; p = p->next) {
+ if (current_position == position) {
+ ;
+ }
+ current_position += p->node->childNum;
+ }
+ }
+ }
+ 
+ return 1;
+ }
+ */
+
+char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_order) {
+    if (n->child == NULL) {
+        char_ptr_array *suborder = (char_ptr_array *) malloc(sizeof(char_ptr_array));
+        init_char_ptr_array(suborder);
+        append_char_ptr_array(suborder, n->taxon);
+
+//printf("returning from leaf: %s\n", n->taxon);
+
+        return suborder;
+    }
+    
+    int failed = 0;
+    char_ptr *i, *j;
+    newick_child *p, *q, *p_prev, *q_prev;
+    
+    char_ptr_array *correct_suborder = (char_ptr_array *) malloc(sizeof(char_ptr_array));
+    init_char_ptr_array(correct_suborder);
+    
+    hash_table *xtab = htab_get_new();
+    
+    for (p = n->child; p != NULL; p = p->next) {
+        char_ptr_array *p_suborder = force_leaf_order_fixed(p->node, correct_order);
+        if (p_suborder == NULL) {
+            failed = 1;
+            break;
+        }
+        htab_insert(xtab, p->node, sizeof(p->node), p_suborder);
+    }
+    
+    if (!failed) {
+        int started = 0;
+        for (i = correct_order->array; i < correct_order->last; ++i) {
+            int found = 0;
+            for (p = n->child; p != NULL; p = p->next) {
+                char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+                for (j = p_subarray->array; j < p_subarray->last; ++j) {
+
+//printf("i:%s j:%s\n", *i, *j);
+
+                    if (strcmp(*i, *j) == 0) {
+                        found = 1;
+                        started = 1;
+                        append_char_ptr_array(correct_suborder, *i);
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            if (started && !found) {
+                failed = 1;
+                break;
+            }
+        }
+    }
+/*
+    printf("BEFOR SUBORDER: ");
+    for (p = n->child; p != NULL; p = p->next) {
+        char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+        char_ptr *i;
+        for (i = p_subarray->array; i < p_subarray->last; ++i) {
+            printf("%s", *i);
+        }
+        printf(" ");
+    }
+    printf("\n");
+    
+    printf("RIGHT SUBORDER: ");
+    for (i = correct_suborder->array; i < correct_suborder->last; ++i) {
+        printf("%s ", *i);
+    }
+    printf("\n");
+*/
+    if (!failed) {
+        p = n->child;
+        p_prev = NULL;
+
+        for (i = correct_suborder->array; i < correct_suborder->last;) {
+            char_ptr_array *p_suborder = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+        
+            printf("comparing %s and %s\n", *i, *(p_suborder->array));
+
+            if (strcmp(*i, *(p_suborder->array)) != 0) {
+                // misorder detected: find suborder to swap with p
+                char_ptr_array *q_suborder = NULL;
+                for (q = p->next, q_prev = p; q != NULL; q_prev = q, q = q->next) {
+                    q_suborder = (char_ptr_array *) htab_lookup(xtab, q->node, sizeof(q->node), compar_addr);
+                    // we will compare only the first element of the suborder assuming
+                    // that these suborders returned from recursive calls are
+                    // ordered correctly. later we increment i with suborder size
+                    if (strcmp(*i, *(q_suborder->array)) == 0) {
+                        break;
+                    }
+                }
+                
+                if (q == NULL) {
+                    failed = 1;
+                    break;
+                    //assert(q != NULL);
+                } else {
+                    printf("swapping %p with %p\n", p, q);
+                    if (p == n->child) {
+                        n->child = q;
+                        q_prev->next = p;
+
+                        newick_child *p_next = p->next;
+                        p->next = q->next;
+                        q->next = p_next;
+                    } else {
+                        p_prev->next = q;
+                        q_prev->next = p;
+
+                        newick_child *p_next = p->next;
+                        p->next = q->next;
+                        q->next = p_next;
+                    }
+                    p = q->next;
+                    printf("inc i with %ld\n", array_size(*q_suborder));
+                    i += array_size(*q_suborder);
+                }
+            } else {
+                printf("inc i with %ld\n", array_size(*p_suborder));
+                i += array_size(*p_suborder);
+                p = p->next;
+            }
+        }
+    }
+    
+    if (failed) {
+        for (p = n->child; p != NULL; p = p->next) {
+            char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+            if (p_subarray != NULL) {
+                free(p_subarray->array);
+                free(p_subarray);
+            }
+        }
+        htab_free_table(xtab);
+        free(correct_suborder->array);
+        free(correct_suborder);
+        return NULL;
+    }
+
+    free(correct_suborder->array);
+    free(correct_suborder);
+
+    printf("AFTER SUBORDER: ");
+    for (p = n->child; p != NULL; p = p->next) {
+        char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+        char_ptr *i;
+        for (i = p_subarray->array; i < p_subarray->last; ++i) {
+            printf("%s", *i);
+        }
+        printf(" ");
+    }
+    printf("\n");
+    
+    // everything should be sorted by this point
+    // push it in a newly allocated array and return
+    char_ptr_array *suborder = (char_ptr_array *) malloc(sizeof(char_ptr_array));
+    init_char_ptr_array(suborder);
+    
+    for (p = n->child; p != NULL; p = p->next) {
+        char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
+        for (i = p_subarray->array; i < p_subarray->last; ++i) {
+            append_char_ptr_array(suborder, *i);
+        }
+        free(p_subarray->array);
+        free(p_subarray);
+    }
+    htab_free_table(xtab);
+
+    return suborder;
+}
+
+int passes_checks(newick_node *species_tree, newick_node *gene_tree) {
+    int ok = 1;
+
+    ok &= check_leaves_not_null(species_tree);
+    ok &= check_leaves_not_null(gene_tree);
+
+    if (!ok) return ok;
+
+    char_ptr_array species_leaf_order, gene_leaf_order;
+    get_dfs_leaf_order(species_tree, &species_leaf_order);
+    get_dfs_leaf_order(gene_tree, &gene_leaf_order);
+
+    ok &= check_leaves_unique(&species_leaf_order);
+    ok &= check_leaves_unique(&species_leaf_order);
+
+    if (!ok) return ok;
+
+    ok &= check_leaf_equivalence(&species_leaf_order, &gene_leaf_order);
+    
+    if (!same_leaf_order(&species_leaf_order, &gene_leaf_order)) {
+        ;//ok &= force_leaf_order();
+    }
+
+    return ok;
+}
+
 int main(int argc, char **argv) {
     newick_node *species_tree = NULL;
     newick_node *gene_tree = NULL;
@@ -757,6 +1102,30 @@ int main(int argc, char **argv) {
     printf("\n\nSpecies tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     printTree(species_tree);
 #endif
+    
+    char_ptr_array species_leaf_order, gene_leaf_order;
+    
+    init_char_ptr_array(&species_leaf_order);
+    init_char_ptr_array(&gene_leaf_order);
+    
+    get_dfs_leaf_order(species_tree, &species_leaf_order);
+    get_dfs_leaf_order(gene_tree, &gene_leaf_order);
+    
+    printf("\n\nspecies leaf order\n");
+    char_ptr *x;
+    for (x = species_leaf_order.array; x != species_leaf_order.last; ++x) {
+        printf("%s ", *x);
+    }
+    printf("\n");
+
+    printf("gene leaf order\n");
+    for (x = gene_leaf_order.array; x != gene_leaf_order.last; ++x) {
+        printf("%s ", *x);
+    }
+    printf("\n");
+    
+    force_leaf_order_fixed(gene_tree, &species_leaf_order);
+    exit(-1);
 
     //max_dist_from_species_root
     real_t max_dist_from_species_root = max_dist_from_root(species_tree);
@@ -954,20 +1323,29 @@ int main(int argc, char **argv) {
         init_node2real_array(&coalescences);
         for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
             real_t dist = max_dist_from_gene_root - n2f->val;
+#ifndef NDEBUG
             printf("\t%f =< %f < %f?", *(fp + 1), dist, *fp);
+#endif
 //            if (dist >= *(fp + 1) && dist < *fp) {
             if (real_cmp(dist, *(fp + 1)) >= 0 && real_cmp(dist, *fp) < 0) {
+#ifndef NDEBUG
                 printf(" y\n");
+#endif
                 node2real coalescence;
                 coalescence.node = n2f->node;
                 coalescence.val = dist;
                 append_node2real_array(&coalescences, coalescence);
                 ++coalescence_events_count;
-            } else                 printf(" n\n");
+            }
+#ifndef NDEBUG
+            else {
+                printf(" n\n");
+            }
+#endif
         }
         //append_int_array(&m, coalescence_events_count);
         append_node2real_array_array(&m, coalescences);
-        printf("%d coalescence events in interval m[%ld]: [%f, %f)\n", coalescence_events_count, m.last - m.array,*(fp + 1), *fp);
+        printf("%d coalescence events in interval m[%ld]: [%f, %f)\n", coalescence_events_count, m.last - m.array, *(fp + 1), *fp);
     }
 
     

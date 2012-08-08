@@ -8,7 +8,7 @@
 #ifndef LCA_H_
 #define LCA_H_
 
-#include "generate_sarray.h"
+#include "traits.h"
 
 void lca_init(int n, node2int_array *);
 int lca(int a, int b);

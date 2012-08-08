@@ -7,9 +7,8 @@
 
 #include "lca.h"
 #include "newick_tree.h"
-#include "generate_sarray.h"
 #include <stdio.h>
-
+#include <stdlib.h>
 
 int timer, n, l;
 int *tin, *tout;
