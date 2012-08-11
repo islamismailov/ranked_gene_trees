@@ -64,6 +64,9 @@ mpfr_ptr max_dist_from_root_mpfr(newick_node *n) {
 }
 
 int combinations(int n, int k) {
+    assert(n >= 0);
+    assert(k >= 0);
+    if (k > n) return 0;
     if (k == 0 || n == k || n <= 1) return 1;
     else return combinations(n - 1, k - 1) + combinations(n - 1, k);
 }
@@ -1353,7 +1356,7 @@ int main(int argc, char **argv) {
 #endif
 
 #ifndef NDEBUG
-    printf("\n\nbead tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nBeaded species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     bead_tree(species_tree, spec_dists, max_dist_from_species_root);
     printTree(species_tree);
@@ -1536,8 +1539,6 @@ int main(int argc, char **argv) {
         }
     }
 
-
-
 #ifndef NDEBUG
     printf("\n\nk array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     
@@ -1555,12 +1556,12 @@ int main(int argc, char **argv) {
     int_array_array lambda;
     init_int_array_array(&lambda);
     
-    for (i = 0; i < speciation_count; ++i) {
+    for (i = 0; i < array_size(Y); ++i) {
         int_array lambda_i;
         init_int_array(&lambda_i);
-        for (j = 0; j < array_size(m.array[i]); ++j) {
+        for (j = 0; j <= array_size(m.array[i]); ++j) {
             int sum = 0;
-            for (z = 0; z < i; ++z) {
+            for (z = 0; z <= i; ++z) {
                 sum += combinations(K.array[i].array[j].array[z], 2);
             }
             append_int_array(&lambda_i, sum);
@@ -1570,12 +1571,13 @@ int main(int argc, char **argv) {
 
 #ifndef NDEBUG
     printf("\n\nlambda array (results):\n---- ---- ---- ---- ---- ---- ---- ----\n");
-    for (i = 0; i < speciation_count; ++i) {
-        for (j = array_size(m.array[i]) - 1; j >= 0; --j) {
+    for (i = 0; i < array_size(Y); ++i) {
+        for (j = 0; j <= array_size(m.array[i]); ++j) {
             printf("\tlambda[%d][%d] = %d\n", i, j, lambda.array[i].array[j]); 
         }
     }
 #endif
+    
     
     printf("\n\nfinal steps:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     
