@@ -15,6 +15,8 @@
 #include "hash_table.h"
 #include "monitored_memory.h"
 
+#define NDEBUG_DEVEL
+
 real_t get_distance_from_root(newick_node *n) {
     real_t dist = n->dist;
     if (n->parent != NULL) dist += get_distance_from_root(n->parent);
@@ -120,8 +122,16 @@ mpfr_ptr theorem3_func_mpfr(int i, int l_i, int n, int_array_array *lambda, mpfr
 
 real_t theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
     
-    if (i == n - 2 && l_i == n - 1) { puts("base"); return 1;}
+    if (i == n - 2 && l_i == n - 1) {
+#ifndef NDEBUG_DEVEL
+        puts("base");
+#endif
+        return 1;
+    }
+
+#ifndef NDEBUG_DEVEL
     printf("i:%d l_i:%d, n:%d\n", i, l_i, n);
+#endif
     
     real_t res = 0;
     int l_i_plus_1;
@@ -159,12 +169,21 @@ real_array *get_speciation_distances(newick_node *t, real_t max_dist_from_root) 
 int do_get_gene_lineages(newick_node *t, real_t limit, real_t distance, real_t max_dist_from_root) {
     int lineages = 0;
     newick_child *p;
+
+#ifndef NDEBUG_DEVEL
     printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+#endif
+
 //    if ((max_dist_from_root - distance - t->dist) <= limit) {
     if (real_cmp((max_dist_from_root - distance - t->dist), limit) <= 0) {
+#ifndef NDEBUG_DEVEL
         puts("y");
+#endif
         return lineages + 1;
-    } else puts("n");
+    }
+#ifndef NDEBUG_DEVEL
+    else puts("n");
+#endif
 
     for (p = t->child; p != NULL; p = p->next) {
         lineages += do_get_gene_lineages(p->node, limit, distance + t->dist, max_dist_from_root);
@@ -207,13 +226,20 @@ int do_get_gene_lineages_for_k(newick_node *t, real_t limit, real_t distance, re
 
     if (!same_topology) return 0;
 
+#ifndef NDEBUG_DEVEL
     printf("\t%f <= %f? ", max_dist_from_root - distance - t->dist, limit);
+#endif
 
 //    if ((max_dist_from_root - distance - t->dist) <= limit) {
     if (real_cmp((max_dist_from_root - distance - t->dist), limit) <= 0) {
+#ifndef NDEBUG_DEVEL
         puts("yes");
+#endif
         return lineages + 1;
-    } else puts("no");
+    }
+#ifndef NDEBUG_DEVEL
+    else puts("no");
+#endif
 
     int child_index = 0;
     for (p = t->child; p != NULL; p = p->next) {
@@ -318,20 +344,20 @@ int do_get_exit_branches(newick_node *n, real_t limit, real_t distance, int_arra
     int exit_branches_count = 0;
     newick_child *p;
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
     printf("\t%f <= %f? ", max_dist_from_root - distance - n->dist, limit);
 #endif
 
 //    if ((max_dist_from_root - distance - n->dist) <= limit) {
     if (real_cmp((max_dist_from_root - distance - n->dist), limit) <= 0) {
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         puts("yes");
         printf("\tchecking for topology prefix...\n");
         printf("\t\tself topology prefix: ");
 #endif
         int *ip, *jp;
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         for (ip = self_topology_prefix->array; ip != self_topology_prefix->last; ++ip) {
             printf("%d", *ip);
         }
@@ -351,12 +377,12 @@ int do_get_exit_branches(newick_node *n, real_t limit, real_t distance, int_arra
                 break;
             }
         }
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         if (is_subset) printf("\tsubset!\n"); else printf("\tnot subset!\n");
 #endif
         if (is_subset) return exit_branches_count + 1;
     } else {
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         puts("no");
 #endif
     }
@@ -380,16 +406,97 @@ int get_exit_branches(newick_node *n, real_t distance, int_array *topology_prefi
     return exit_branches_count;
 }
 
+
+
+int do_get_exit_branches_fixed(newick_node *n, real_t limit, real_t distance, real_t max_dist_from_root, char_ptr_array *species_leaf_descendants, hash_table *gene_leaf_descendants) {
+    int exit_branches_count = 0;
+    newick_child *p;
+    
+#ifndef NDEBUG_DEVEL
+    printf("\t%.16f <= %.16f? ", max_dist_from_root - distance - n->dist, limit);
+#endif
+    
+    //    if ((max_dist_from_root - distance - n->dist) <= limit) {
+    if (real_cmp((max_dist_from_root - distance - n->dist), limit) <= 0) {
+        
+#ifndef NDEBUG_DEVEL
+        puts("yes");
+        printf("\tchecking for descendants...\n");
+        printf("\t\tgene node descendants: ");
+#endif
+        char_ptr *iip, *jjp;
+        char_ptr_array *leaf_descendants = htab_lookup(gene_leaf_descendants, n, sizeof(n), compar_addr);
+
+#ifndef NDEBUG_DEVEL
+        for (iip = leaf_descendants->array; iip != leaf_descendants->last; ++iip) {
+            printf("%s ", *iip);
+        }
+        printf("\n");
+        printf("\t\tspecies descendants: ");
+        
+        for (iip = species_leaf_descendants->array; iip != species_leaf_descendants->last; ++iip) {
+            printf("%s ", *iip);
+        }
+#endif
+        int is_subset = 1;
+        for (iip = leaf_descendants->array; iip != leaf_descendants->last; ++iip) {
+            int found = 0;
+            for (jjp = species_leaf_descendants->array; jjp != species_leaf_descendants->last; ++jjp) {
+                if (strcmp(*iip, *jjp) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                is_subset = 0;
+                break;
+            }
+        }
+#ifndef NDEBUG_DEVEL
+        if (is_subset) printf("\tsubset!\n"); else printf("\tnot subset!\n");
+#endif
+        if (is_subset) return exit_branches_count + 1;
+    }
+#ifndef NDEBUG_DEVEL
+      else puts("no");
+#endif
+    
+    int child_idx;
+    for (p = n->child, child_idx = 0; p != NULL; p = p->next, ++child_idx) {
+        exit_branches_count += do_get_exit_branches_fixed(p->node, limit, distance + n->dist, max_dist_from_root, species_leaf_descendants, gene_leaf_descendants);
+    }
+    
+    return exit_branches_count;
+}
+
+int get_exit_branches_fixed(newick_node *n, real_t distance, real_t max_dist_from_root, char_ptr_array *species_leaf_descendants, hash_table *gene_leaf_descendants) {
+    int_array self_topology_prefix;
+    init_int_array(&self_topology_prefix);
+    int exit_branches_count = do_get_exit_branches_fixed(n, distance, 0.f, max_dist_from_root, species_leaf_descendants, gene_leaf_descendants);
+    free(self_topology_prefix.array);
+    return exit_branches_count;
+}
+
 void add_nodes_in_interval(newick_node_ptr_array *arr, newick_node *n, real_t start_interval, real_t end_interval, real_t max_root_distance) {
     //TODO: optimize, can call "get_distance_from_root" only once (in driver, move this to do_driver)
     real_t root_dist = get_distance_from_root(n);
     real_t dist = max_root_distance - root_dist;
+
+#ifndef NDEBUG_DEVEL
     printf("\t\tnode@%p with taxon %s: %f <= %f < %f", n, n->taxon, start_interval, dist, end_interval);
+#endif
+
 //    if (dist >= start_interval && dist < end_interval) {
     if (real_cmp(dist, start_interval) >= 0 && real_cmp(dist, end_interval) < 0) {
+
+#ifndef NDEBUG_DEVEL
         printf(" y\n");
+#endif
         append_newick_node_ptr_array(arr, n);
-    } else printf(" n\n");
+    }
+#ifndef NDEBUG_DEVEL
+      else printf(" n\n");
+#endif
 
     newick_child *p;
     for (p = n->child; p != NULL; p = p->next) {
@@ -429,8 +536,9 @@ void do_bead_tree(newick_node *t, real_t distance, real_array *speciation_distan
 //            if (*fp > start_interval && *fp < end_interval) {
             if (real_cmp(*fp, start_interval) > 0 && real_cmp(*fp, end_interval) < 0) {
 
+#ifndef NDEBUG_DEVEL
                 printf("\t%f in interval <%f, %f>\n", *fp, start_interval, end_interval);
-
+#endif
                 bead = (newick_node *) monitored_malloc(sizeof(newick_node));
                 bead->child = child;
                 bead->parent = child->node->parent;
@@ -512,7 +620,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
         init_newick_node_ptr_array(&cur_interval_nodes);
         
         // species_tree is a beaded tree in here
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         printf("\tNodes in interval [%f, %f)\n", *(fp + 1), *fp);
 #endif
         add_nodes_in_interval(&cur_interval_nodes, species_tree, *(fp + 1), *fp, max_dist_from_species_root);
@@ -523,7 +631,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
             matidx *indices = (matidx *) malloc(sizeof(matidx));
             indices->i = i, indices->j = j;
             htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
             hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
             printf("\t\tMapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
 #endif
@@ -540,7 +648,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
     init_newick_node_ptr_array(&cur_interval_nodes);
     
     // species_tree is a beaded tree in here
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
     printf("\tNodes in interval [%f, %f)\n", 0.f, *fp);
 #endif
     add_nodes_in_interval(&cur_interval_nodes, species_tree, 0.f, *fp, max_dist_from_species_root);
@@ -551,7 +659,7 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
         matidx *indices = (matidx *) malloc(sizeof(matidx));
         indices->i = i, indices->j = j;
         htab_insert(mat_idx_tab, cur_interval_nodes.array[j], sizeof(newick_node), indices);
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
         hash_t h_val = htab_hash(cur_interval_nodes.array[j], sizeof(newick_node));
         printf("\t\tMapped node@%p to <%d,%d> hash: %llu\n", cur_interval_nodes.array[j], i, j, h_val);
 #endif
@@ -559,27 +667,6 @@ void construct_y_matrix(hash_table *mat_idx_tab, newick_node_ptr_array_array *Y,
     // get nodes for the current tau
     append_newick_node_ptr_array_array(Y, cur_interval_nodes);
     
-}
-
-
-
-
-
-
-
-
-
-
-
-
-void do_get_all_descedants_taxa(newick_node *n, char_ptr_array *descedants_array_taxa) {
-    newick_child *p;
-
-    if (n->taxon != NULL) append_char_ptr_array(descedants_array_taxa, n->taxon);
-
-    for (p = n->child; p != NULL; p = p->next) {
-        do_get_all_descedants_taxa(p->node, descedants_array_taxa);
-    }
 }
 
 int get_species_node_id_for_taxon(newick_node *n, char *t) {
@@ -601,7 +688,15 @@ int get_species_node_id_for_taxon(newick_node *n, char *t) {
     return id;
 }
 
-
+void do_get_all_descedants_taxa(newick_node *n, char_ptr_array *descedants_array_taxa) {
+    newick_child *p;
+    
+    if (n->taxon != NULL) append_char_ptr_array(descedants_array_taxa, n->taxon);
+    
+    for (p = n->child; p != NULL; p = p->next) {
+        do_get_all_descedants_taxa(p->node, descedants_array_taxa);
+    }
+}
 
 char_ptr_array *get_all_descedants_taxa(newick_node *n) {
     newick_child *p;
@@ -612,6 +707,28 @@ char_ptr_array *get_all_descedants_taxa(newick_node *n) {
         do_get_all_descedants_taxa(p->node, descedants_array_taxa);
     }
 
+    return descedants_array_taxa;
+}
+
+void do_get_all_descedant_leaves_taxa(newick_node *n, char_ptr_array *descedants_array_taxa) {
+    //printf("node %p, its child %p and taxon %s\n", n, n->child, n->taxon);
+    if (n->child == NULL) append_char_ptr_array(descedants_array_taxa, n->taxon);
+    
+    newick_child *p;
+    for (p = n->child; p != NULL; p = p->next) {
+        do_get_all_descedant_leaves_taxa(p->node, descedants_array_taxa);
+    }
+}
+
+char_ptr_array *get_all_descedant_leaves_taxa(newick_node *n) {
+    //newick_child *p;
+    char_ptr_array *descedants_array_taxa = (char_ptr_array*) malloc(sizeof(char_ptr_array));
+    init_char_ptr_array(descedants_array_taxa);
+    
+    //for (p = n->child; p != NULL; p = p->next) {
+        do_get_all_descedant_leaves_taxa(n, descedants_array_taxa);
+    //}
+    
     return descedants_array_taxa;
 }
 
@@ -796,74 +913,6 @@ void taxon_swap_front(newick_node *n, char_ptr *taxon) {
     }
 }
 
-
-
-
-/*
- int force_leaf_order(newick_node *n, char_ptr_array *species_leaf_order, char_ptr_array *gene_leaf_order, char_ptr_array *current_order) {
- 
- if (n->child == NULL) {
- append_char_ptr_array(current_order, n->taxon);
- return 1;
- }
- 
- newick_child *p;
- 
- char_ptr_array suborder;
- init_char_ptr_array(&suborder);
- 
- for (p = n->child; p != NULL; p = p->next) {
- force_leaf_order(p->node, species_leaf_order, gene_leaf_order, &suborder);
- }
- 
- // we have stuff in order, now we need to actually put it in order by rearranging leaves
- 
- // get correct order for the taxa we've got
- 
- int started = 0;
- char_ptr *i, *j;
- char_ptr_array correct_suborder;
- init_char_ptr_array(&correct_suborder);
- for (i = species_leaf_order->array; i != species_leaf_order->last; ++i) {
- int found = 0;
- for (j = suborder.array; j != suborder.last; ++j) {
- if (strcmp(*i, *j) == 0) {
- if (!started) started = 1;
- found = 1;
- break;
- }
- 
- if (found) {
- append_char_ptr_array(&correct_suborder, *j);
- } else {
- if (started) {
- // we've got a leaf from different branch inside correct order,
- // which means that we cannot force this tree to that order, so
- // cleanup and return fail
- return 0;
- }
- }
- }
- }
- 
- for (i = correct_suborder.array, j = suborder.array; j != correct_suborder.last && j != suborder.last; ++i, ++j) {
- if (strcmp(*i, *j) != 0) {
- // we need to find (*i) in suborder and put it in (j - suborder)-th position
- int position = j - suborder.array;
- int current_position = 0;
- for (p = n->child; p != NULL; p = p->next) {
- if (current_position == position) {
- ;
- }
- current_position += p->node->childNum;
- }
- }
- }
- 
- return 1;
- }
- */
-
 char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_order) {
     if (n->child == NULL) {
         char_ptr_array *suborder = (char_ptr_array *) malloc(sizeof(char_ptr_array));
@@ -942,9 +991,10 @@ char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_o
 
         for (i = correct_suborder->array; i < correct_suborder->last;) {
             char_ptr_array *p_suborder = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
-        
-            printf("comparing %s and %s\n", *i, *(p_suborder->array));
 
+#ifndef NDEBUG_DEVEL
+            printf("comparing %s and %s\n", *i, *(p_suborder->array));
+#endif
             if (strcmp(*i, *(p_suborder->array)) != 0) {
                 // misorder detected: find suborder to swap with p
                 char_ptr_array *q_suborder = NULL;
@@ -963,7 +1013,9 @@ char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_o
                     break;
                     //assert(q != NULL);
                 } else {
+#ifndef NDEBUG_DEVEL
                     printf("swapping %p with %p\n", p, q);
+#endif
                     if (p == n->child) {
                         n->child = q;
                         q_prev->next = p;
@@ -980,11 +1032,15 @@ char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_o
                         q->next = p_next;
                     }
                     p = q->next;
+#ifndef NDEBUG_DEVEL
                     printf("inc i with %ld\n", array_size(*q_suborder));
+#endif
                     i += array_size(*q_suborder);
                 }
             } else {
+#ifndef NDEBUG_DEVEL
                 printf("inc i with %ld\n", array_size(*p_suborder));
+#endif
                 i += array_size(*p_suborder);
                 p = p->next;
             }
@@ -1008,6 +1064,7 @@ char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_o
     free(correct_suborder->array);
     free(correct_suborder);
 
+#ifndef NDEBUG_DEVEL
     printf("AFTER SUBORDER: ");
     for (p = n->child; p != NULL; p = p->next) {
         char_ptr_array *p_subarray = (char_ptr_array *) htab_lookup(xtab, p->node, sizeof(p->node), compar_addr);
@@ -1018,7 +1075,7 @@ char_ptr_array *force_leaf_order_fixed(newick_node *n, char_ptr_array *correct_o
         printf(" ");
     }
     printf("\n");
-    
+#endif
     // everything should be sorted by this point
     // push it in a newly allocated array and return
     char_ptr_array *suborder = (char_ptr_array *) malloc(sizeof(char_ptr_array));
@@ -1046,6 +1103,9 @@ int passes_checks(newick_node *species_tree, newick_node *gene_tree) {
     if (!ok) return ok;
 
     char_ptr_array species_leaf_order, gene_leaf_order;
+    init_char_ptr_array(&species_leaf_order);
+    init_char_ptr_array(&gene_leaf_order);
+    
     get_dfs_leaf_order(species_tree, &species_leaf_order);
     get_dfs_leaf_order(gene_tree, &gene_leaf_order);
 
@@ -1055,11 +1115,18 @@ int passes_checks(newick_node *species_tree, newick_node *gene_tree) {
     if (!ok) return ok;
 
     ok &= check_leaf_equivalence(&species_leaf_order, &gene_leaf_order);
-    
+/*
+    // rotation implementation is not powerful enough (yet)
     if (!same_leaf_order(&species_leaf_order, &gene_leaf_order)) {
-        ;//ok &= force_leaf_order();
-    }
+        char_ptr_array *ret = force_leaf_order_fixed(gene_tree, &species_leaf_order);
+        ok &= (ret != NULL);
 
+        if (ret != NULL) {
+            free(ret->array);
+            free(ret);
+        }
+    }
+*/
     return ok;
 }
 
@@ -1102,7 +1169,7 @@ int main(int argc, char **argv) {
     printf("\n\nSpecies tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     printTree(species_tree);
 #endif
-    
+/*
     char_ptr_array species_leaf_order, gene_leaf_order;
     
     init_char_ptr_array(&species_leaf_order);
@@ -1126,14 +1193,21 @@ int main(int argc, char **argv) {
     
     force_leaf_order_fixed(gene_tree, &species_leaf_order);
     exit(-1);
+*/
+    if (!passes_checks(species_tree, gene_tree)) {
+        puts("BAD INPUT");
+        exit(-1);
+    }
 
     //max_dist_from_species_root
     real_t max_dist_from_species_root = max_dist_from_root(species_tree);
     real_t max_dist_from_gene_root = max_dist_from_root(gene_tree);
 
 #ifndef NDEBUG
-    printf("\n\nMax distance from root for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nMax distance from root (height) for species tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     printf("\t%f\n", max_dist_from_species_root);
+    printf("\n\nMax distance from root (height) for gene tree:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\t%f\n", max_dist_from_gene_root);
 #endif
 
     // find speciation distances (0 is max distance from species root)
@@ -1163,31 +1237,26 @@ int main(int argc, char **argv) {
     // get coalescence array of the gene tree (find all nodes that have children)
     coalescence_array = get_coalescence_array(gene_tree);
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
     printf("\n\nIndexed Coalescence array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
-        printf("\tnode@%p with node id %f(%ld array idx) childnum %d taxon %s\n", n2f->node, n2f->val, (n2f - coalescence_array->array), n2f->node->childNum, n2f->node->taxon);
+        printf("\tnode@%p with dist from root %f(%ld array idx) childnum %d taxon %s\n", n2f->node, n2f->val, (n2f - coalescence_array->array), n2f->node->childNum, n2f->node->taxon);
     }
 #endif
-
-#ifndef NDEBUG
-    printf("\n\nIndexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
-#endif
-
+    
     // assign each node of species tree integer id (sorted by distance from the root)
     // to fast search for our lca implementation
     species_indexed_nodes = get_indexed_array(species_tree);
 
-#ifndef NDEBUG
-{
+#ifndef NDEBUG_DEVEL
+    printf("\n\nIndexed species array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     node2int *n2i;
     for (n2i = species_indexed_nodes->array; n2i != species_indexed_nodes->last; ++n2i) {
         printf("\tnode@%p ith node id %d and array index %ld taxon %s\n", n2i->node, n2i->node->id, (n2i - species_indexed_nodes->array), n2i->node->taxon);
     }
-}
 #endif
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
     printf("\n\nLCA preprocessing:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     lca_init(species_indexed_nodes->last - species_indexed_nodes->array, species_indexed_nodes);
@@ -1218,7 +1287,7 @@ int main(int argc, char **argv) {
 
                 n2f = (coalescence_array->array + k);
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                 printf("\n\nAll descedants taxa and their equivalent ids for node@%p:\n---- ---- ---- ---- ---- ---- ---- ----\n", n2f->node);
 #endif
 
@@ -1232,23 +1301,23 @@ int main(int argc, char **argv) {
                     id = get_species_node_id_for_taxon(species_tree, *taxon);
                     if (id != -1) append_int_array(equivalent_node_ids, id);
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                     printf("\ttaxon:%s id:%d\n", *taxon == NULL ? "NULL" : *taxon, id);
 #endif
                 }
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                 printf("\n\tLCA search:\n");
 #endif
 
                 // now we need to find lowest common ancestor for these nodes
                 lca_idx = *(equivalent_node_ids->array);
                 for (ip = (equivalent_node_ids->array + 1); ip != equivalent_node_ids->last; ++ip) {
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                     printf("\t\tLCA(%d, %d): ", lca_idx, *ip);
 #endif
                     lca_idx = lca(lca_idx, *ip);
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                     printf("%d\n", lca_idx);
 #endif
                 }
@@ -1265,7 +1334,7 @@ int main(int argc, char **argv) {
 
                 int tau_idx = fp - spec_dists->array;
 
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                 printf("\n\tLCA Overall: %d with Tau index %d\n", lca_idx, tau_idx);
 #endif
 
@@ -1289,7 +1358,7 @@ int main(int argc, char **argv) {
     bead_tree(species_tree, spec_dists, max_dist_from_species_root);
     printTree(species_tree);
     
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
     printf("\n\nY matrix construction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
     
@@ -1315,42 +1384,86 @@ int main(int argc, char **argv) {
     node2real_array_array m;
     init_node2real_array_array(&m);
 
-    //int_array m;
-    //init_int_array(&m);
     for (fp = spec_dists->array; fp != (spec_dists->last - 1); ++fp) {
         int coalescence_events_count = 0;
         node2real_array coalescences;
         init_node2real_array(&coalescences);
         for (n2f = coalescence_array->array; n2f != coalescence_array->last; ++n2f) {
             real_t dist = max_dist_from_gene_root - n2f->val;
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
             printf("\t%f =< %f < %f?", *(fp + 1), dist, *fp);
 #endif
 //            if (dist >= *(fp + 1) && dist < *fp) {
             if (real_cmp(dist, *(fp + 1)) >= 0 && real_cmp(dist, *fp) < 0) {
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
                 printf(" y\n");
 #endif
                 node2real coalescence;
                 coalescence.node = n2f->node;
                 coalescence.val = dist;
+#ifndef NDEBUG_DEVEL
+                printf("m[%d][%d]=%f\n", m.last - m.array, coalescences.last - coalescences.array, dist);
+#endif
                 append_node2real_array(&coalescences, coalescence);
                 ++coalescence_events_count;
             }
-#ifndef NDEBUG
+#ifndef NDEBUG_DEVEL
             else {
                 printf(" n\n");
             }
 #endif
         }
-        //append_int_array(&m, coalescence_events_count);
         append_node2real_array_array(&m, coalescences);
-        printf("%d coalescence events in interval m[%ld]: [%f, %f)\n", coalescence_events_count, m.last - m.array, *(fp + 1), *fp);
+#ifndef NDEBUG
+        printf("\t%d coalescence events in interval m[%ld]: [%f, %f)\n", coalescence_events_count, m.last - m.array - 1, *(fp + 1), *fp);
+#endif
+    }
+    
+    node2int_array *gene_indexed_nodes = get_indexed_array(gene_tree);
+    node2int_array *beaded_indexed_nodes = get_indexed_array(species_tree);
+
+#ifndef NDEBUG
+    printf("\n\nGene descendants:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
+    hash_table *gene_leaf_descendants = htab_get_new();
+    for (i = 0; i < array_size(*gene_indexed_nodes); ++i) {
+        char_ptr_array *descendants = get_all_descedant_leaves_taxa(gene_indexed_nodes->array[i].node);
+
+#ifndef NDEBUG
+        printf("\t%p: ", gene_indexed_nodes->array[i].node);
+        char_ptr *x;
+        for (x = descendants->array; x != descendants->last; ++x) {
+            printf("%s ", *x);
+        }
+        printf("\n");
+#endif
+        
+        htab_insert(gene_leaf_descendants, gene_indexed_nodes->array[i].node, sizeof(gene_indexed_nodes->array[i].node), descendants);
     }
 
-    
 #ifndef NDEBUG
-    printf("\n\nk array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nSpecies descendants:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+#endif
+
+    hash_table *species_leaf_descendants = htab_get_new();
+    for (i = 0; i < array_size(*beaded_indexed_nodes); ++i) {
+        char_ptr_array *descendants = get_all_descedant_leaves_taxa(beaded_indexed_nodes->array[i].node);
+
+#ifndef NDEBUG
+        printf("\t%p: ", beaded_indexed_nodes->array[i].node);
+        char_ptr *x;
+        for (x = descendants->array; x != descendants->last; ++x) {
+            printf("%s ", *x);
+        }
+        printf("\n");
+#endif
+
+        htab_insert(species_leaf_descendants, beaded_indexed_nodes->array[i].node, sizeof(beaded_indexed_nodes->array[i].node), descendants);
+    }
+    
+#ifndef NDEBUG_DEVEL
+    printf("\n\nk array constuction:\n---- ---- ---- ---- ---- ---- ---- ----\n");
 #endif
 
     // k[][][] array
@@ -1374,9 +1487,12 @@ int main(int argc, char **argv) {
         }
         append_int_array_array_array(&K, mtx_to_add);
     }
-    
+
+#ifndef NDEBUG_DEVEL
     printf("speciation count: %d\n", speciation_count);
-    for (i = 1; i < speciation_count; ++i) {
+#endif
+
+    for (i = 0; i < speciation_count; ++i) {
 
         int arsize = Y.array[i].last - Y.array[i].array;
         
@@ -1384,67 +1500,57 @@ int main(int argc, char **argv) {
 //        printf("y[%d] has %ld elements\n", i, array_size((Y.array)[i]));
         
         for (z = 0; z < array_size(Y.array[i]); ++z) {
-            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
-            printf("run for spec_dists[%d]=%f\n", i-1, (spec_dists->array)[i - 1]);
-            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, max_dist_from_species_root);
-        }
-    }
-    
-    // fill values for k[i][m[i]][z]
-    for (i = 1; i < speciation_count; ++i) {
-        printf("y[%d] has %ld elements\n", i - 1, array_size(Y.array[i - 1]));
-        for (z = 0; z < array_size(Y.array[i - 1]); ++z) {
-            printf("\ty[%d][%d] has %d children:\n", i - 1, z, Y.array[i-1].array[z]->childNum);
-            K.array[i].array[array_size(m.array[i])].array[z] = 0;
-            newick_child *p;
-            for (p = Y.array[i - 1].array[z]->child; p != NULL; p = p->next) {
-                // we need to fetch i,j indices of p->node
+#ifndef NDEBUG_DEVEL
+            printf("k[%d][0][%d]:\n", i, z);
+#endif
+            //int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
+#ifndef NDEBUG_DEVEL
+            printf("run for spec_dists[%d]=%f\n", i, (spec_dists->array)[i]);
+#endif
+//            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, max_dist_from_gene_root);
+            char_ptr_array *descendants = htab_lookup(species_leaf_descendants, Y.array[i].array[z], sizeof(Y.array[i].array[z]), compar_addr);
 
-                matidx *indices = (matidx *) htab_lookup(mat_idx_tab, p->node, sizeof(newick_node), compar_addr);
+#ifndef NDEBUG_DEVEL
+            printf("looking up %p\n", Y.array[i].array[z]);
+#endif
 
-                printf("\t\tchild@%p of K[%d][m[%d]][%d] (K[%d][%ld][%d]) / Y[%d][%d]: ", p->node, i, i, z, i, array_size(m.array[i]), z, i - 1, z);
-                if (indices != NULL) {
-                    printf("FOUND ");
-                } else {
-                    printf("FOUND\n");
-                }
-                if (indices == NULL) continue;
-                printf("at y[%d][%d]\n", indices->i, indices->j);
-            }
-            int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[z]);
-            K.array[i].array[0].array[z] = get_exit_branches(gene_tree, (spec_dists->array)[i - 1], &topology_prefix, max_dist_from_species_root);
+            assert(descendants != NULL);
+            K.array[i].array[0].array[z] = get_exit_branches_fixed(gene_tree, spec_dists->array[i], max_dist_from_gene_root, descendants, gene_leaf_descendants);
         }
     }
 
-    for (i = 0; i < speciation_count; ++i) {
-        for (j = array_size(m.array[i]) - 1; j > 0; --j) {
-            for (z = 0; z < array_size(Y.array[i]); ++z) {
-                if (j == 0 && i == speciation_count - 1) {
-                    K.array[i].array[j].array[z] = 0;
-                    continue;
-                }
-                // get # of lineages
-                real_t dist = (max_dist_from_species_root - m.array[i].array[j].val) - 1e-6;
-                printf("dist %.6f\n", dist);
-                int_array topology_prefix = get_topology_prefix(species_tree, Y.array[i].array[j]);
-                K.array[i].array[j].array[z] = get_gene_lineages_for_k(&dist, gene_tree, max_dist_from_species_root, &topology_prefix);
+    for (i = 0; i < array_size(Y); ++i) {
+        for (z = 0; z < array_size(Y.array[i]); ++z) {
+            // start j = 1 because j = 0 already calculated
+            for (j = 1; j <= array_size(m.array[i]); ++j) {
+                //real_t dist = (max_dist_from_gene_root - m.array[i].array[j].val);
+                real_t dist = m.array[i].array[j - 1].val;
+                real_t EPS = 2 * fmax(REAL_T_EPS, REAL_T_EPS * fabs(dist));
 
+#ifndef NDEBUG_DEVEL
+                printf("k[%d][%d][%d]: with distance %f\n", i, j, z, dist);
+#endif
+
+                K.array[i].array[j].array[z] = get_exit_branches_fixed(gene_tree, dist - EPS, max_dist_from_gene_root, htab_lookup(species_leaf_descendants, Y.array[i].array[z], sizeof(Y.array[i].array[z]), compar_addr), gene_leaf_descendants);
             }
         }
     }
+
+
 
 #ifndef NDEBUG
-    printf("\n\nk array (results):\n---- ---- ---- ---- ---- ---- ---- ----\n");
-    for (i = 0; i < speciation_count; ++i) {
-        printf("coalescense events at m[%d]=%ld\n", i, array_size(m.array[i]));
-        for (j = array_size(m.array[i]) - 1; j >= 0; --j) {
-            for (z = 0; z < array_size(Y.array[i]); ++z) {
+    printf("\n\nk array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    
+    for (i = 0; i < array_size(Y); ++i) {
+        for (z = 0; z < array_size(Y.array[i]); ++z) {
+            // start j = 1 because j = 0 already calculated
+            for (j = 0; j <= array_size(m.array[i]); ++j) {
                 printf("\tK[%d][%d][%d] = %d\n", i, j, z, K.array[i].array[j].array[z]);
             }
         }
     }
 #endif
-    
+
     // lambda array
     int_array_array lambda;
     init_int_array_array(&lambda);

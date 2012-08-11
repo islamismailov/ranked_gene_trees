@@ -9,23 +9,27 @@ int max(int a, int b) {
 }
 
 int flt_cmp(double *a, double *b) {
+//    double error = fmax(fabs(*a), fabs(*b)) * REAL_T_EPS;
+//    if (*a - *b > error) return  1;
+//    if (*b - *a > error) return -1;
+//    return 0;
+
     double diff = *a - *b;
-    double error = fmax(DBL_EPSILON, DBL_EPSILON * fmax(fabs(*a), fabs(*b)));
-    if (diff > error) return 1;
+    double error = fmax(REAL_T_EPS, REAL_T_EPS * fmax(fabs(*a), fabs(*b)));
+    if (diff >  error) return  1;
     if (diff < -error) return -1;
-    
     return 0;
 
     //double diff = *a - *b;
-    //if (diff > DBL_EPSILON) return  1;
-    //if (diff < DBL_EPSILON) return -1;
+    //if (diff > REAL_T_EPS) return  1;
+    //if (diff < REAL_T_EPS) return -1;
     //return 0;
 }
 
 int flt_cmp_desc(double *a, double *b) {
     return -flt_cmp(a, b);
     //double abs_diff = *a - *b;
-    //double error = fmax(DBL_EPSILON, DBL_EPSILON * fmax(fabs(*a), fabs(*b)));
+    //double error = fmax(REAL_T_EPS, REAL_T_EPS * fmax(fabs(*a), fabs(*b)));
     //if (abs_diff > error) return -1;
     //if (abs_diff < -error) return 1;
     //

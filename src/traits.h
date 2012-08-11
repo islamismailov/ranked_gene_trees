@@ -8,6 +8,7 @@
 #include "newick_tree.h"
 
 typedef double real_t;
+#define REAL_T_EPS DBL_EPSILON
 
 #define MPFR_PRECISION 1024
 
