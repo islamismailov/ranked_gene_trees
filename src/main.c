@@ -15,7 +15,7 @@
 #include "hash_table.h"
 #include "monitored_memory.h"
 
-#define NDEBUG_DEVEL
+//#define NDEBUG_DEVEL
 
 real_t get_distance_from_root(newick_node *n) {
     real_t dist = n->dist;
@@ -138,9 +138,11 @@ real_t theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambd
     
     real_t res = 0;
     int l_i_plus_1;
+    printf("l_i_plus_1 inited with %f\n", fmax(l_i, g->array[i + 1]));
     for (l_i_plus_1 = fmax(l_i, g->array[i + 1]); l_i_plus_1 < n; ++l_i_plus_1) {
         res += theorem3_func(i + 1, l_i_plus_1, n, lambda, spec_dists, m) * theorem2_func(i + 1, l_i_plus_1, n, g, lambda, spec_dists, m);
     }
+    printf("ret: %f\n", res);
     return res;
 }
 
@@ -1526,7 +1528,6 @@ int main(int argc, char **argv) {
         for (z = 0; z < array_size(Y.array[i]); ++z) {
             // start j = 1 because j = 0 already calculated
             for (j = 1; j <= array_size(m.array[i]); ++j) {
-                //real_t dist = (max_dist_from_gene_root - m.array[i].array[j].val);
                 real_t dist = m.array[i].array[j - 1].val;
                 real_t EPS = 2 * fmax(REAL_T_EPS, REAL_T_EPS * fabs(dist));
 
@@ -1552,7 +1553,6 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    // lambda array
     int_array_array lambda;
     init_int_array_array(&lambda);
     
@@ -1570,7 +1570,7 @@ int main(int argc, char **argv) {
     }
 
 #ifndef NDEBUG
-    printf("\n\nlambda array (results):\n---- ---- ---- ---- ---- ---- ---- ----\n");
+    printf("\n\nlambda array:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     for (i = 0; i < array_size(Y); ++i) {
         for (j = 0; j <= array_size(m.array[i]); ++j) {
             printf("\tlambda[%d][%d] = %d\n", i, j, lambda.array[i].array[j]); 
@@ -1578,20 +1578,18 @@ int main(int argc, char **argv) {
     }
 #endif
     
-    
     printf("\n\nfinal steps:\n---- ---- ---- ---- ---- ---- ---- ----\n");
     
     int l_1;
-    n = speciation_count;
+    n = speciation_count + 1;
     real_t P = 0;
-    for (l_1 = g.array[0]; l_1 < speciation_count; ++l_1) {
+    for (l_1 = g.array[0]; l_1 < n; ++l_1) {
         P += theorem2_func(0, l_1, n, &g, &lambda, spec_dists, &m) / H(l_1);
     }
     
-    printf("final answer: %f\n", P);
+    printf("\tfinal answer: %f\n", P);
     
     lca_end();
     monitored_memory_end();
     return 0;
 }
-
