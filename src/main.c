@@ -83,6 +83,7 @@ real_t H(int l_1) {
 real_t theorem3_func(int i, int l_i, int n, int_array_array *lambda, real_array *spec_dists, node2real_array_array *m) {
     int j, k;
     real_t P = 0;
+    printf("\ttheorem3 called with i=%d, l_i=%d, n=%d, m[%d]=%d\n", i, l_i,n,i,array_size(m->array[i]));
     for (j = 0; j < array_size(m->array[i]); ++j) {
         real_t nom = expf(-lambda->array[i].array[j] * (spec_dists->array[i - 1] - spec_dists->array[i]));
         real_t denom = 1.0;
@@ -91,7 +92,12 @@ real_t theorem3_func(int i, int l_i, int n, int_array_array *lambda, real_array 
             denom *= (lambda->array[i].array[k] - lambda->array[i].array[j]);
         }
         P += nom / denom;
+        
+        printf("\t\tnominator:%f\n",nom);
+        printf("\t\tdenominator:%f\n",denom);
+        
     }
+    printf("\t\tth3 ret: %f\n",P);
     return P;
 }
 
@@ -127,22 +133,23 @@ real_t theorem2_func(int i, int l_i, int n, int_array *g, int_array_array *lambd
     
     if (i == n - 2 && l_i == n - 1) {
 #ifndef NDEBUG_DEVEL
-        puts("base");
+        puts("\tbase");
 #endif
         return 1;
     }
 
 #ifndef NDEBUG_DEVEL
-    printf("i:%d l_i:%d, n:%d\n", i, l_i, n);
+    printf("theorem2 called:\n");
+    printf("\ti:%d l_i:%d, n:%d\n", i, l_i, n);
 #endif
     
     real_t res = 0;
     int l_i_plus_1;
-    printf("l_i_plus_1 inited with %f\n", fmax(l_i, g->array[i + 1]));
+    //printf("l_i_plus_1 inited with %f\n", fmax(l_i, g->array[i + 1]));
     for (l_i_plus_1 = fmax(l_i, g->array[i + 1]); l_i_plus_1 < n; ++l_i_plus_1) {
         res += theorem3_func(i + 1, l_i_plus_1, n, lambda, spec_dists, m) * theorem2_func(i + 1, l_i_plus_1, n, g, lambda, spec_dists, m);
     }
-    printf("ret: %f\n", res);
+    printf("\tth2 ret: %f\n", res);
     return res;
 }
 
